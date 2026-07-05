@@ -1,0 +1,45 @@
+# -------------------------------- dependencies ---------------------------------
+dependencies:
+  opengatellm:
+    url: ${OPENGATELLM_URL:-http://localhost:8000}
+    model_name: ${OPENGATELLM_MODEL_NAME:-text-embedding-3-small}
+    model_vector_size: 1536
+
+  postgres: # required
+    url: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@${POSTGRES_HOST:-localhost}:${POSTGRES_PORT:-5432}/postgres
+    echo: False
+    pool_size: 5
+    connect_args:
+      server_settings:
+        statement_timeout: "120s"
+      command_timeout: 60
+
+  
+  elasticsearch:
+    index_name: opengatellm
+    index_language: english
+    number_of_shards: 1
+    number_of_replicas: 0
+    refresh_interval: 1s
+    hosts: "http://${ELASTICSEARCH_HOST:-localhost}:${ELASTICSEARCH_PORT:-9200}"
+    basic_auth:
+      - "elastic"
+      - ${ELASTICSEARCH_PASSWORD}
+
+# ---------------------------------- settings -----------------------------------
+settings:
+  # disabled_routers: ["collections"]
+  # hidden_routers: ["documents"]
+  # app_title: My OpenGateLLM API
+
+  # log_level: INFO
+  # log_format: [%(asctime)s][%(process)d:%(name)s][%(levelname)s] %(client_ip)s - %(message)s
+
+  swagger_version: 0.4.7
+  # swagger_contact_url: https://github.com/etalab-ia/OpenGateLLM
+  # swagger_contact_email: john.doe@example.com
+  # swagger_docs_url: /docs
+  # swagger_redoc_url: /redoc
+
+  # monitoring_sentry_enabled: True
+  # monitoring_prometheus_enabled: True
