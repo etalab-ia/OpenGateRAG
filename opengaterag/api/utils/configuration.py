@@ -1,3 +1,4 @@
+from enum import StrEnum
 from functools import lru_cache, wraps
 import logging
 import os
@@ -159,11 +160,23 @@ class Dependencies(ConfigBaseModel):
 
 
 # settings -------------------------------------------------------------------------------------------------------------------------------------------
+class Tokenizer(StrEnum):
+    TIKTOKEN_GPT2 = "tiktoken_gpt2"
+    TIKTOKEN_R50K_BASE = "tiktoken_r50k_base"
+    TIKTOKEN_P50K_BASE = "tiktoken_p50k_base"
+    TIKTOKEN_P50K_EDIT = "tiktoken_p50k_edit"
+    TIKTOKEN_CL100K_BASE = "tiktoken_cl100k_base"
+    TIKTOKEN_O200K_BASE = "tiktoken_o200k_base"
+
+
 @custom_validation_error()
 class Settings(ConfigBaseModel):
     """
     General settings configuration fields.
     """
+
+    # document_parsing
+    document_parsing_max_concurrent: int = Field(default=10, ge=1, description="Maximum number of concurrent document parsing tasks per worker.")  # fmt: off
 
     # general
     disabled_routers: list[RouterName] = Field(default_factory=list, description="Disabled routers to limits services of the API.", examples=[["embeddings"]], json_schema_extra={"default": []})  # fmt: off
@@ -173,6 +186,12 @@ class Settings(ConfigBaseModel):
     # logging
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO", description="Logging level of the API.")  # fmt: off
     log_format: str = Field(default="[%(asctime)s][%(process)d:%(name)s][%(levelname)s] %(client_ip)s - %(message)s", description="Logging format of the API.")  # fmt: off
+
+    # monitoring
+    monitoring_prometheus_enabled: bool = Field(default=True, description="If true, Prometheus metrics will be exposed in the `/metrics` endpoint.")  # fmt: off
+
+    # usage tokenizer
+    usage_tokenizer: Tokenizer = Field(default=Tokenizer.TIKTOKEN_GPT2, description="Tokenizer used to compute usage of the API.")
 
     # swagger
     swagger_summary: str = Field(default="OpenGateLLM connect to your models. You can configuration this swagger UI in the configuration file, like hide routes or change the title.", description="Display summary of your API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.", examples=["My API description."])  # fmt: off
@@ -185,12 +204,6 @@ class Settings(ConfigBaseModel):
     swagger_openapi_url: str = Field(default="/openapi.json", pattern=r"^/", description="OpenAPI URL of swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.")  # fmt: off
     swagger_docs_url: str = Field(default="/docs", pattern=r"^/", description="Docs URL of swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.")  # fmt: off
     swagger_redoc_url: str = Field(default="/redoc", pattern=r"^/", description="Redoc URL of swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.")  # fmt: off
-
-    # monitoring
-    monitoring_prometheus_enabled: bool = Field(default=True, description="If true, Prometheus metrics will be exposed in the `/metrics` endpoint.")  # fmt: off
-
-    # document_parsing
-    document_parsing_max_concurrent: int = Field(default=10, ge=1, description="Maximum number of concurrent document parsing tasks per worker.")  # fmt: off
 
 
 # load config ----------------------------------------------------------------------------------------------------------------------------------------

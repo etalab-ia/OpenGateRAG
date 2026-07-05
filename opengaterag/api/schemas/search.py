@@ -7,7 +7,6 @@ from pydantic_core import CoreSchema
 
 from opengaterag.api.schemas import BaseModel
 from opengaterag.api.schemas.chunks import Chunk, MetadataFloat, MetadataInt, MetadataStr
-from opengaterag.api.schemas.usage import Usage
 from opengaterag.api.utils.exceptions import WrongSearchMethodException
 
 
@@ -103,4 +102,3 @@ class Search(BaseModel):
 class Searches(BaseModel):
     object: Annotated[Literal["list"], Field(default="list", description="The type of the object.")]
     data: Annotated[list[Search], Field(description="List of search results.")]
-    usage: Annotated[Usage, Field(default_factory=Usage, description="Usage information for the request.")]

@@ -4,11 +4,13 @@ from elasticsearch import AsyncElasticsearch
 from fastapi import FastAPI
 import httpx
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+import tiktoken
+from tiktoken.core import Encoding
 
 from opengaterag.api.helpers._documentmanager import DocumentManager
 from opengaterag.api.helpers._elasticsearchvectorstore import ElasticsearchVectorStore
 from opengaterag.api.helpers._parsermanager import ParserManager
-from opengaterag.api.utils.configuration import Configuration, get_configuration
+from opengaterag.api.utils.configuration import Configuration, Tokenizer, get_configuration
 from opengaterag.api.utils.context import global_context
 from opengaterag.api.utils.logging import init_logger
 
@@ -20,14 +22,15 @@ async def lifespan(_: FastAPI):
     configuration = get_configuration()
 
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"http://{configuration.dependencies.opengatellm.url}/health", timeout=60)
+        response = await client.get(f"{configuration.dependencies.opengatellm.url}/health", timeout=60)
         if response.status_code != 200:
             raise RuntimeError("OpenGateLLM is not reachable.")
 
     global_context.elasticsearch_client = await create_elasticsearch_client(configuration)
     global_context.postgres_engine, global_context.postgres_session_factory = create_postgres_session_factory(configuration)
-    global_context.elasticsearch_vector_store = await create_elasticsearch_vector_store(configuration, global_context.elasticsearch_client, global_context.model_registry, global_context.postgres_session_factory)  # fmt: off
-    global_context.document_manager = create_document_manager(configuration, elasticsearch_vector_store=global_context.elasticsearch_vector_store)
+    global_context.elasticsearch_vector_store = await create_elasticsearch_vector_store(configuration=configuration, elasticsearch_client=global_context.elasticsearch_client)  # fmt: off
+    global_context.document_manager = create_document_manager(configuration=configuration)
+    global_context.tokenizer = create_tokenizer(configuration=configuration)
 
     yield
 
@@ -54,6 +57,22 @@ async def create_elasticsearch_client(configuration: Configuration) -> AsyncElas
         await client.close()
         raise RuntimeError("Elasticsearch database is not reachable.")
     return client
+
+
+def create_tokenizer(configuration: Configuration) -> Encoding:
+    match configuration.settings.usage_tokenizer:
+        case Tokenizer.TIKTOKEN_O200K_BASE:
+            return tiktoken.get_encoding("o200k_base")
+        case Tokenizer.TIKTOKEN_P50K_BASE:
+            return tiktoken.get_encoding("p50k_base")
+        case Tokenizer.TIKTOKEN_R50K_BASE:
+            return tiktoken.get_encoding("r50k_base")
+        case Tokenizer.TIKTOKEN_P50K_EDIT:
+            return tiktoken.get_encoding("p50k_edit")
+        case Tokenizer.TIKTOKEN_CL100K_BASE:
+            return tiktoken.get_encoding("cl100k_base")
+        case Tokenizer.TIKTOKEN_GPT2:
+            return tiktoken.get_encoding("gpt2")
 
 
 def create_postgres_session_factory(configuration: Configuration) -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:

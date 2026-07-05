@@ -50,7 +50,6 @@ async def search(
         rff_k=body.rff_k,
         score_threshold=body.score_threshold,
     )
-    usage = request_context.get().usage
-    content = Searches(data=data, usage=usage)
+    content = Searches(data=data)
 
     return JSONResponse(content=content.model_dump(mode="json"), status_code=200)

@@ -198,8 +198,7 @@ class DocumentManager:
             # parse the file
             try:
                 content = await self.parser_manager.parse(file=file)
-                tokenizer = global_context.tokenizer
-                document_token_count = len(tokenizer.tokenizer.encode(content))
+                document_token_count = len(global_context.tokenizer.encode(content))
             except Exception as e:
                 logger.exception(f"failed to parse {document_name} ({e}).")
                 raise ParsingDocumentFailedException()
@@ -264,7 +263,6 @@ class DocumentManager:
             try:
                 await self._upsert_document_chunks(
                     chunks=chunks,
-                    model_api_key=request_context.get().api_key,
                     elasticsearch_vector_store=elasticsearch_vector_store,
                     elasticsearch_client=elasticsearch_client,
                     request_context=request_context,
@@ -392,8 +390,8 @@ class DocumentManager:
             )
             for i, chunk in enumerate(chunks, start=start)
         ]
-        tokenizer = global_context.tokenizer
-        chunks_token_count = sum([len(tokenizer.tokenizer.encode(chunk.content)) for chunk in chunks])
+
+        chunks_token_count = sum([len(global_context.tokenizer.encode(chunk.content)) for chunk in chunks])
         storage_limit, storage_consumption = await self._get_storage_limit_and_consumption(postgres_session=postgres_session, user_id=user_id)
         if storage_limit is not None and storage_consumption > storage_limit:
             raise InsufficientStorageLimitException(
@@ -458,8 +456,7 @@ class DocumentManager:
 
         content = chunks[0].content
         if content:
-            tokenizer = global_context.tokenizer
-            chunk_token_count = len(tokenizer.tokenizer.encode(content))
+            chunk_token_count = len(global_context.tokenizer.encode(content))
 
             await postgres_session.execute(
                 statement=update(table=DocumentTable)

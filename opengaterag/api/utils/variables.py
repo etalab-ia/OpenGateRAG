@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-DEFAULT_APP_NAME = "opengaterag"
+DEFAULT_APP_NAME = "OpengateRAG"
 
 
 class RouterName(StrEnum):

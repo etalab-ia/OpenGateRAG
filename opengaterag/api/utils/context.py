@@ -10,12 +10,12 @@ class GlobalContext(BaseModel):
     elasticsearch_client: Any = None
     postgres_session_factory: Any = None
     postgres_engine: Any = None
+    tokenizer: Any = None
 
 
 class RequestContext(BaseModel):
     api_key: str
     user_id: int | None
-    role_id: int | None
 
 
 global_context: GlobalContext = GlobalContext.model_construct()

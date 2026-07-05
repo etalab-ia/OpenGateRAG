@@ -22,7 +22,7 @@ class AccessController:
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 url=f"{configuration.dependencies.opengatellm.url}/v1/me/info",
-                headers={"Authorization": f"Bearer {api_key.credentials}"},
+                headers={"Authorization": f"Bearer {api_key}"},
                 timeout=10,
             )
             if response.status_code != 200:
@@ -30,6 +30,5 @@ class AccessController:
 
             data = response.json()
             user_id = data["id"]
-            role_id = data["role_id"]
 
-        request_context.set(RequestContext(api_key=api_key, user_id=user_id, role_id=role_id))
+        request_context.set(RequestContext(api_key=api_key, user_id=user_id))
