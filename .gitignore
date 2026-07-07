@@ -219,3 +219,4 @@ __marimo__/
 
 # OpengateRAG
 config.yml
+.DS_Store

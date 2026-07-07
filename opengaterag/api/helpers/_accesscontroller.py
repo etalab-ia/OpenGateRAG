@@ -18,12 +18,13 @@ class AccessController:
         if not api_key.credentials:
             raise InvalidAPIKeyException()
 
-        api_key = api_key.credentials.split(" ")[1]
+        if not api_key.credentials.startswith("sk-"):
+            raise InvalidAPIKeyException()
 
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 url=f"{configuration.dependencies.opengatellm.url}/v1/me/info",
-                headers={"Authorization": f"Bearer {api_key}"},
+                headers={"Authorization": f"Bearer {api_key.credentials}"},
                 timeout=10,
             )
             try:
@@ -32,6 +33,5 @@ class AccessController:
                 raise InvalidAPIKeyException()
 
             data = response.json()
-            user_id = data["id"]
 
-        request_context.set(RequestContext(api_key=api_key, user_id=user_id))
+        request_context.set(RequestContext(api_key=api_key.credentials, user_id=data["id"], user_permissions=data["permissions"]))

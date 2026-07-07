@@ -32,6 +32,7 @@ async def create_collection(
         visibility=body.visibility,
         description=body.description,
         user_id=request_context.get().user_id,
+        user_permissions=request_context.get().user_permissions,
     )
 
     return JSONResponse(status_code=201, content={"id": collection_id})
@@ -127,6 +128,7 @@ async def update_collection(
     await document_manager.update_collection(
         postgres_session=postgres_session,
         user_id=request_context.get().user_id,
+        user_permissions=request_context.get().user_permissions,
         collection_id=collection_id,
         name=body.name,
         visibility=body.visibility,

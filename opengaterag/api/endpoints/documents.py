@@ -160,7 +160,7 @@ async def create_document_chunks(
         postgres_session=postgres_session,
         document_id=document_id,
         chunks=body.chunks,
-        user_id=request_context.get().user_info.id,
+        user_id=request_context.get().user_id,
         elasticsearch_vector_store=elasticsearch_vector_store,
         elasticsearch_client=elasticsearch_client,
         request_context=request_context,
@@ -189,7 +189,7 @@ async def delete_document_chunk(
         elasticsearch_client=elasticsearch_client,
         document_id=document_id,
         chunk_id=chunk_id,
-        user_id=request_context.get().user_info.id,
+        user_id=request_context.get().user_id,
     )
     return Response(status_code=204)
 

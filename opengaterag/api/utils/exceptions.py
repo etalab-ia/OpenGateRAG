@@ -13,6 +13,11 @@ class WrongSearchMethodException(HTTPException):
 
 
 # 403
+class InsufficientPermissionException(HTTPException):
+    def __init__(self, detail: str = "Insufficient rights.") -> None:
+        super().__init__(status_code=403, detail=detail)
+
+
 class InvalidAuthenticationSchemeException(HTTPException):
     def __init__(self, detail: str = "Invalid authentication scheme.") -> None:
         super().__init__(status_code=403, detail=detail)

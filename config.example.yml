@@ -1,12 +1,12 @@
 # -------------------------------- dependencies ---------------------------------
 dependencies:
   opengatellm:
-    url: ${OPENGATELLM_URL:-http://localhost:8000}
-    model_name: ${OPENGATELLM_MODEL_NAME:-text-embedding-3-small}
-    model_vector_size: 1536
+    url: ${OPENGATELLM_URL:-https://albert.api.etalab.gouv.fr}
+    model_name: ${OPENGATELLM_MODEL_NAME:-openweight-embedding}
+    model_vector_size: ${OPENGATELLM_MODEL_VECTOR_SIZE:-1024}
 
   postgres: # required
-    url: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@${POSTGRES_HOST:-localhost}:${POSTGRES_PORT:-5432}/postgres
+    url: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@${POSTGRES_HOST:-localhost}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
     echo: False
     pool_size: 5
     connect_args:
@@ -21,10 +21,10 @@ dependencies:
     number_of_shards: 1
     number_of_replicas: 0
     refresh_interval: 1s
-    hosts: "http://${ELASTICSEARCH_HOST:-localhost}:${ELASTICSEARCH_PORT:-9200}"
+    hosts: http://${ELASTICSEARCH_HOST:-localhost}:${ELASTICSEARCH_PORT:-9200}
     basic_auth:
-      - "elastic"
-      - ${ELASTICSEARCH_PASSWORD}
+      - ${ELASTICSEARCH_USERNAME:-elastic}
+      - ${ELASTICSEARCH_PASSWORD:-changeme}
 
 # ---------------------------------- settings -----------------------------------
 settings:
@@ -35,7 +35,7 @@ settings:
   # log_level: INFO
   # log_format: [%(asctime)s][%(process)d:%(name)s][%(levelname)s] %(client_ip)s - %(message)s
 
-  swagger_version: 0.4.7
+  swagger_version: 0.1.0
   # swagger_contact_url: https://github.com/etalab-ia/OpenGateLLM
   # swagger_contact_email: john.doe@example.com
   # swagger_docs_url: /docs

@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from opengaterag.api.schemas.core import PermissionType
+
 
 class GlobalContext(BaseModel):
     document_manager: Any = None
@@ -15,7 +17,8 @@ class GlobalContext(BaseModel):
 
 class RequestContext(BaseModel):
     api_key: str
-    user_id: int | None
+    user_id: int
+    user_permissions: list[PermissionType]
 
 
 global_context: GlobalContext = GlobalContext.model_construct()

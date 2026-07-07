@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from opengaterag.api.schemas.chunks import Chunk, ChunkMetadata, InputChunk
 from opengaterag.api.schemas.collections import Collection, CollectionVisibility
+from opengaterag.api.schemas.core import PermissionType
 from opengaterag.api.schemas.documents import Document, PresetSeparators
 from opengaterag.api.schemas.search import ComparisonFilter, CompoundFilter, Search, SearchMethod
 from opengaterag.api.utils.context import RequestContext, global_context
@@ -24,6 +25,7 @@ from opengaterag.api.utils.exceptions import (
     CollectionNotFoundException,
     DocumentNotFoundException,
     FileSizeLimitExceededException,
+    InsufficientPermissionException,
     InsufficientStorageLimitException,
     ParsingDocumentFailedException,
     VectorizationFailedException,
@@ -48,7 +50,16 @@ class DocumentManager:
         self.parser_manager = parser_manager
 
     @staticmethod
-    async def create_collection(postgres_session: AsyncSession, user_id: int, name: str, visibility: CollectionVisibility, description: str | None = None) -> int:  # fmt: off
+    async def create_collection(
+        postgres_session: AsyncSession,
+        user_id: int,
+        user_permissions: list[str],
+        name: str,
+        visibility: CollectionVisibility,
+        description: str | None = None,
+    ) -> int:
+        if visibility == CollectionVisibility.PUBLIC and not PermissionType.can_create_public_collection(user_permissions):
+            raise InsufficientPermissionException()
         query = (
             insert(table=CollectionTable)
             .values(name=name, user_id=user_id, visibility=visibility, description=description)
@@ -85,7 +96,18 @@ class DocumentManager:
         await elasticsearch_vector_store.delete_collection(client=elasticsearch_client, collection_id=collection_id)
 
     @staticmethod
-    async def update_collection(postgres_session: AsyncSession, user_id: int, collection_id: int, name: str | None = None, visibility: CollectionVisibility | None = None, description: str | None = None) -> None:  # fmt: off
+    async def update_collection(
+        postgres_session: AsyncSession,
+        user_id: int,
+        user_permissions: list[PermissionType],
+        collection_id: int,
+        name: str | None = None,
+        visibility: CollectionVisibility | None = None,
+        description: str | None = None,
+    ) -> None:
+        if visibility == CollectionVisibility.PUBLIC and not PermissionType.can_create_public_collection(user_permissions):
+            raise InsufficientPermissionException()
+
         # check if collection exists
         result = await postgres_session.execute(
             statement=select(CollectionTable)
@@ -416,7 +438,6 @@ class DocumentManager:
                 chunks=chunks,
                 elasticsearch_vector_store=elasticsearch_vector_store,
                 elasticsearch_client=elasticsearch_client,
-                postgres_session=postgres_session,
                 request_context=request_context,
             )
         except Exception as e:
