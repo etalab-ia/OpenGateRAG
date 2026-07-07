@@ -1,0 +1,58 @@
+name: Semgrep
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types:
+      - published
+      - edited
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  semgrep-diff:
+    name: Semgrep SAST (diff)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Semgrep (diff only)
+        run: semgrep ci --config auto --verbose
+
+  semgrep-full:
+    name: Semgrep SAST (full)
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Semgrep (WARNING severity)
+        run: |
+          semgrep scan \
+            --config auto \
+            --config p/default \
+            --config p/secrets \
+            --config p/security-audit \
+            --config .github/semgrep-rules.yml \
+            --severity WARNING \
+            --verbose
+          exit 0  # Never block this job
+
+      - name: Run Semgrep (ERROR severity only)
+        run: |
+          semgrep scan \
+            --config auto \
+            --config p/default \
+            --config p/secrets \
+            --config p/security-audit \
+            --config .github/semgrep-rules.yml \
+            --severity ERROR \
+            --error \
+            --verbose
