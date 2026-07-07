@@ -56,32 +56,35 @@ jobs:
           commit_user_name: "GitHub Actions"
           commit_user_email: "actions@github.com"
 
-  # e2e-tests:
-  #   name: e2e tests
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - uses: actions/checkout@v4
-  #   - name: Run e2e tests
-  #     run: |
-  #       # Install uv
-  #       curl -LsSf https://astral.sh/uv/install.sh | sh
-  #       echo "$HOME/.local/bin" >> $GITHUB_PATH
+  e2e-tests:
+    name: e2e tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
 
-  #       # Create a local virtual environment and install dependencies
-  #       "$HOME/.local/bin/uv" venv
-  #       "$HOME/.local/bin/uv" pip install -p .venv/bin/python ".[test]"
+    - name: Start OpenGateLLM services
+      run: docker compose --file .github/tests/compose.yml up --detach
+      env:
+        ALBERT_ADMIN_API_KEY: ${{ secrets.ALBERT_ADMIN_API_KEY }}
 
-  #       # Activate venv for the test run
-  #       . .venv/bin/activate
+    - name: Setup test users and API keys
+      run: .github/tests/setup_tests.sh
 
-  #       echo "Listing files in root:"
-  #       ls -la .
-  #       echo "Listing files in api/tests/integ:"
-  #       ls -la api/tests/integ
+    - name: Run e2e tests
+      run: |
+        # Install uv
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-  #       # Run integration tests
-  #       pytest opengaterag/api/tests/e2e
-  #     env:
-  #       CONFIG_FILE: ./config.example.yml
-  #       OPENGATELLM_USER_API_KEY: ${{ secrets.ALBERT_USER_API_KEY }}
-  #       OPENGATELLM_ADMIN_API_KEY: ${{ secrets.ALBERT_ADMIN_API_KEY }}
+        # Create a local virtual environment and install dependencies
+        "$HOME/.local/bin/uv" venv
+        "$HOME/.local/bin/uv" pip install -p .venv/bin/python ".[test]"
+
+        # Activate venv for the test run
+        . .venv/bin/activate
+        pytest .github/tests/e2e
+      env:
+        CONFIG_FILE: ./config.example.yml
+        OPENGATELLM_URL: http://localhost:8000
+        OPENGATELLM_MODEL_NAME: openweight-embeddings
+        OPENGATELLM_MODEL_VECTOR_SIZE: 1024

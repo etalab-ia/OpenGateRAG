@@ -1,0 +1,55 @@
+services:
+  postgres:
+    extends:
+      file: ../../compose.example.yml
+      service: postgres
+
+  elasticsearch:
+    extends:
+      file: ../../compose.example.yml
+      service: elasticsearch
+
+  redis:
+    image: redis/redis-stack-server:7.4.0-v7
+    restart: always
+    environment:
+      REDIS_ARGS: "--dir /data --requirepass changeme --user redis on >password ~* allcommands --save 60 1 --appendonly yes"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 4s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  api:
+    image: ghcr.io/etalab-ia/opengatellm/api:latest
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - ALBERT_ADMIN_API_KEY=${ALBERT_ADMIN_API_KEY}
+    volumes:
+      - ".github/tests/config.yml:/config.yml:ro"
+    healthcheck:
+        test: [ "CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1" ]
+        interval: 4s
+        timeout: 10s
+        retries: 5
+        start_period: 60s
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    
+
+volumes:
+  postgres:
+  redis:
+  elasticsearch:

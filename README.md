@@ -1,4 +1,4 @@
-# OpengateRAG
+# OpenGateRAG
 
 ## Developer mode (local API)
 

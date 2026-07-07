@@ -217,6 +217,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# OpengateRAG
+# OpenGateRAG
 config.yml
 .DS_Store
