@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import AliasChoices, ConfigDict, Field, GetJsonSchemaHandler, PositiveInt, StringConstraints, model_validator
+from pydantic import ConfigDict, Field, GetJsonSchemaHandler, PositiveInt, StringConstraints, model_validator
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema
 
@@ -59,7 +59,7 @@ class CompoundFilter(BaseModel):
 
 
 class SearchArgs(BaseModel):
-    collection_ids: Annotated[list[PositiveInt], Field(default=[], min_length=0, max_length=100, validation_alias=AliasChoices("collection_ids", "collections"), serialization_alias="collection_ids", description="List of collections ID.")]  # fmt: off
+    collection_ids: Annotated[list[PositiveInt], Field(default=[], min_length=0, max_length=100, description="List of collections ID.")]  # fmt: off
     document_ids: Annotated[list[PositiveInt], Field(default=[], min_length=0, max_length=100, description="List of document IDs")]
     metadata_filters: Annotated[ComparisonFilter | CompoundFilter | None, Field(default=None, description="Metadata filters to apply to the search.")]  # fmt: off
     limit: Annotated[int, Field(gt=0, le=100, default=10, description="Number of results to return.")]
@@ -79,18 +79,8 @@ class SearchArgs(BaseModel):
 
 
 class CreateSearch(SearchArgs):
-    query: Annotated[str | None, StringConstraints(strip_whitespace=True, min_length=1), Field(default=None, validation_alias=AliasChoices("query", "prompt"), serialization_alias="query", description="Query related to the search.")]  # fmt: off
+    query: Annotated[str | None, StringConstraints(strip_whitespace=True, min_length=1), Field(default=None, description="Query related to the search.")]  # fmt: off
     model_config = ConfigDict(populate_by_name=True)
-
-    @model_validator(mode="after")
-    def validate_query(self) -> "CreateSearch":
-        if not self.query:
-            if not self.prompt:
-                raise ValueError("query or prompt must be provided")
-            else:
-                self.query = self.prompt
-
-        return self
 
 
 class Search(BaseModel):
