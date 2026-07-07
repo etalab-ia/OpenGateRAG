@@ -12,6 +12,25 @@ from opengaterag.api.main import app
 from opengaterag.api.utils.configuration import configuration
 
 
+def refresh_elasticsearch_index() -> None:
+    """Force Elasticsearch to make recently indexed chunks visible to search."""
+
+    async def _refresh() -> None:
+        kwargs = configuration.dependencies.elasticsearch.model_dump()
+        index_name = kwargs.pop("index_name")
+        kwargs.pop("index_language")
+        kwargs.pop("number_of_shards")
+        kwargs.pop("number_of_replicas")
+        kwargs.pop("refresh_interval")
+        client = AsyncElasticsearch(**kwargs)
+        try:
+            await client.indices.refresh(index=index_name)
+        finally:
+            await client.close()
+
+    asyncio.run(_refresh())
+
+
 class AuthenticatedTestClient:
     """Wrap a shared TestClient and inject auth headers per request."""
 
@@ -98,3 +117,15 @@ def admin_client(test_client: TestClient) -> AuthenticatedTestClient:
     """Test client authenticated as an admin user."""
     api_key = _validate_opengatellm_api_key("OPENGATELLM_ADMIN_API_KEY", "admin")
     return AuthenticatedTestClient(client=test_client, api_key=api_key)
+
+
+@pytest.fixture(scope="function")
+def es_refresh():
+    """
+    Callable fixture: call `es_refresh()` after writes so searches see fresh data.
+
+    We return the callable (instead of auto-refresh) so tests can refresh exactly
+    after indexing (documents/chunks) and avoid timing-based sleeps.
+    """
+
+    return refresh_elasticsearch_index

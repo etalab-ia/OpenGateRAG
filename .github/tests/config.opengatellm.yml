@@ -1,7 +1,7 @@
 # -------------------------------- dependencies ---------------------------------
 dependencies:
   postgres:
-    url: postgresql+asyncpg://postgres:changeme@localhost:5432/postgres
+    url: postgresql+asyncpg://postgres:changeme@postgres:5432/postgres
     echo: False
     pool_size: 10
     max_overflow: 5
@@ -14,7 +14,7 @@ dependencies:
       command_timeout: 60
 
   redis:
-    url: redis://:changeme@localhost:6379
+    url: redis://:changeme@redis:6379
     max_connections: 200
     socket_connect_timeout: 5
     retry_on_timeout: True
@@ -27,25 +27,24 @@ dependencies:
     number_of_shards: 1
     number_of_replicas: 1
     refresh_interval: 1s
-    hosts: http://localhost:9200
+    hosts: http://elasticsearch:9200
     basic_auth:
-      - elasticsearch
+      - elastic
       - changeme
 
 # ---------------------------------- settings -----------------------------------
 settings:
-  vector_store_model: BAAI/bge-m3
+  vector_store_model: openweight-embeddings
 
 # ----------------------------------- models ------------------------------------
 models:  
-  - name: BAAI/bge-m3
+  - name: openweight-embeddings
     type: text-embeddings-inference
-    aliases: ["openweight-embedding"]
     cost_prompt_tokens: 10
     cost_completion_tokens: 30
     providers:
       - type: albert
-        key: ${ALBERT_API_ADMIN_KEY}
+        key: ${ALBERT_ADMIN_API_KEY}
         timeout: 120
         model_name: BAAI/bge-m3
         model_total_params: 8

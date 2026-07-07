@@ -21,34 +21,7 @@
     uvicorn opengaterag.api.app:app --reload
     ```
 
-## Run e2e tests
-
-* Install dependencies
-
-    ```bas
-    pip install ".[test]"
-    ```
-
-* Export environment variables
-
-    We recommand to run e2e test on the official Albert API and with a local Elasticsearch and Postgres instances.
-
-    Export a key of a user of your the setup OpenGateLLM API (`opengatellm.url` parameter in your configuration file) without `ADMIN` permission in `OPENGATELLM_USER_API_KEY` environment variable and a key of a user 
-    with `ADMIN` permission in `OPENGATELLM_ADMIN_API_KEY` environment variable.
-
-    Both users need to access to the setup embeddings model of the OpenGateLLM API (`opengatellm.model_name` parameter in your configuration file).
-
-    ```bash
-    export OPENGATELLM_USER_API_KEY=<your_user_api_key>
-    export OPENGATELLM_ADMIN_API_KEY=<your_admin_api_key>
-    ```
-* Run tests
-
-    ```
-    pytest opengaterag/api/tests/e2e/
-    ```
-
-## Run unit tests
+## Run tests
 
 * Install dependencies
 

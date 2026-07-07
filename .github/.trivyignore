@@ -1,0 +1,9 @@
+# perl-archive-tar: perl-archive-tar: Path traversal via 
+# crafted symlinks allows arbitrary file access
+# https://avd.aquasec.com/nvd/cve-2026-42496
+CVE-2026-42496 exp:2026-09-01
+
+# perl: Perl: Heap buffer overflow when compiling regular 
+# expressions on 32-bit builds...
+# https://avd.aquasec.com/nvd/cve-2026-8376
+CVE-2026-8376 exp:2026-09-01
