@@ -5,7 +5,7 @@ import logging
 from typing import Literal
 
 from elasticsearch import AsyncElasticsearch
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 import httpx
 from langchain_text_splitters import RecursiveCharacterTextSplitter as LangChainRecursiveCharacterTextSplitter
 from sqlalchemy import Integer, cast, delete, distinct, func, insert, or_, select, text, update
@@ -507,7 +507,14 @@ class DocumentManager:
                 json={"input": input_texts, "model": self.model_name, "encoding_format": "float"},
                 timeout=120,
             )
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            except Exception:
+                try:
+                    detail = response.json()["detail"]
+                except Exception:
+                    detail = response.text
+                raise HTTPException(status_code=response.status_code, detail=detail)
 
             data = response.json()
             return [vector["embedding"] for vector in data["data"]]

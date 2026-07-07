@@ -18,14 +18,17 @@ class AccessController:
         if not api_key.credentials:
             raise InvalidAPIKeyException()
 
-        api_key, user_id, role_id = api_key.credentials, None, None
+        api_key = api_key.credentials.split(" ")[1]
+
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 url=f"{configuration.dependencies.opengatellm.url}/v1/me/info",
                 headers={"Authorization": f"Bearer {api_key}"},
                 timeout=10,
             )
-            if response.status_code != 200:
+            try:
+                response.raise_for_status()
+            except Exception:
                 raise InvalidAPIKeyException()
 
             data = response.json()
