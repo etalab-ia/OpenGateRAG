@@ -2,7 +2,7 @@ name: opengatellm
 
 services:
   rag:
-    image: ghcr.io/etalab-ia/opengatellm/rag:latest
+    image: ghcr.io/opengaterag:latest
     restart: always
     env_file: .env
     environment:
@@ -13,41 +13,6 @@ services:
       - "${CONFIG_FILE:-./config.yml}:/config.yml:ro"
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1" ]
-
-  postgres:
-    image: postgres:16.5
-    restart: always
-    user: postgres
-    environment:
-      - "POSTGRES_USER=${POSTGRES_USER:-postgres}"
-      - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}"
-      - "POSTGRES_DB=postgres"
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready", "-U", "postgres" ]
-      interval: 4s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-
-  redis:
-    image: redis/redis-stack-server:7.4.0-v7
-    restart: always
-    environment:
-      REDIS_ARGS: "--dir /data --requirepass ${REDIS_PASSWORD:-changeme} --user ${REDIS_USER:-redis} on >password ~* allcommands --save 60 1 --appendonly yes"
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis:/data
-    healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
-      interval: 4s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.0.2

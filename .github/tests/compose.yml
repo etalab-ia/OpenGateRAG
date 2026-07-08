@@ -1,21 +1,33 @@
 services:
-  postgres:
-    extends:
-      file: ../../compose.example.yml
-      service: postgres
-
   elasticsearch:
     extends:
       file: ../../compose.example.yml
       service: elasticsearch
 
+  postgres:
+    image: postgres:16.5
+    restart: always
+    user: postgres
+    environment:
+      - "POSTGRES_USER=postgres"
+      - "POSTGRES_PASSWORD=changeme"
+      - "POSTGRES_DB=postgres"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready", "-U", "postgres" ]
+      interval: 4s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
   redis:
     image: redis/redis-stack-server:7.4.0-v7
     restart: always
     environment:
       REDIS_ARGS: "--dir /data --requirepass changeme --user redis on >password ~* allcommands --save 60 1 --appendonly yes"
-    ports:
-      - "6379:6379"
     volumes:
       - redis:/data
     healthcheck:

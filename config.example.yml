@@ -1,12 +1,12 @@
 # -------------------------------- dependencies ---------------------------------
 dependencies:
   opengatellm:
-    url: ${OPENGATELLM_URL:-https://albert.api.etalab.gouv.fr}
+    url: ${OPENGATELLM_URL:-http://localhost:8000}
     model_name: ${OPENGATELLM_MODEL_NAME:-openweight-embedding}
     model_vector_size: ${OPENGATELLM_MODEL_VECTOR_SIZE:-1024}
 
-  postgres: # required
-    url: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@${POSTGRES_HOST:-localhost}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+  postgres:
+    url: ${OPENGATELLM_DATABASE_URL:-postgresql+asyncpg://postgres:changeme@localhost:5432/postgres}
     echo: False
     pool_size: 5
     connect_args:
@@ -14,10 +14,9 @@ dependencies:
         statement_timeout: "120s"
       command_timeout: 60
 
-  
   elasticsearch:
-    index_name: opengatellm
-    index_language: english
+    index_name: opengaterag
+    index_language: french
     number_of_shards: 1
     number_of_replicas: 0
     refresh_interval: 1s
@@ -30,13 +29,13 @@ dependencies:
 settings:
   # disabled_routers: ["collections"]
   # hidden_routers: ["documents"]
-  # app_title: My OpenGateLLM API
+  # app_title: My OpenGateRAG API
 
   # log_level: INFO
   # log_format: [%(asctime)s][%(process)d:%(name)s][%(levelname)s] %(client_ip)s - %(message)s
 
   swagger_version: 0.1.0
-  # swagger_contact_url: https://github.com/etalab-ia/OpenGateLLM
+  # swagger_contact_url: https://github.com/etalab-ia/OpenGateRAG
   # swagger_contact_email: john.doe@example.com
   # swagger_docs_url: /docs
   # swagger_redoc_url: /redoc
