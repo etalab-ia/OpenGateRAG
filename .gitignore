@@ -220,3 +220,4 @@ __marimo__/
 # OpenGateRAG
 config.yml
 .DS_Store
+compose.yml
