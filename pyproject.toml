@@ -35,8 +35,16 @@ test = [
     "pytest-cov>=7.0.0",
 ]
 
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [tool.setuptools]
 py-modules = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["opengaterag*"]
 
 [tool.ruff]
 line-length = 150

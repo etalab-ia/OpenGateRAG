@@ -8,13 +8,10 @@ from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 from sqlalchemy.types import JSON
 
+from opengaterag.api.schemas.collections import CollectionVisibility
+
 DEFAULT_TIMEOUT = 300
 COUNTRY_CODES = [country.alpha_3 for country in pycountry.countries] + ["WOR"]
-
-
-class CollectionVisibility(StrEnum):
-    PRIVATE = "private"
-    PUBLIC = "public"
 
 
 class LimitType(StrEnum):

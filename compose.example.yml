@@ -1,4 +1,4 @@
-name: opengatellm
+name: opengaterag
 
 services:
   rag:

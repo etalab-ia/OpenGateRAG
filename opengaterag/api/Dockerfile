@@ -13,15 +13,15 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /
+WORKDIR /app
 
-COPY ./opengaterag/api/ opengaterag/api/api
+COPY ./pyproject.toml /app/pyproject.toml
+COPY ./opengaterag /app/opengaterag
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv venv
+    uv venv /.venv
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv pip install .
+    uv pip install --python /.venv/bin/python .
 
 # Runtime stage
 FROM python:3.12-slim AS runtime
@@ -38,15 +38,13 @@ RUN apt-get update && apt-get install -y \
 
 # Set a non-root user
 USER opengaterag
-WORKDIR /
+WORKDIR /app
 
 # Copy application from builder
-COPY --from=builder --chown=opengaterag:opengaterag opengaterag/api /api
 COPY --from=builder --chown=opengaterag:opengaterag /.venv /.venv
 COPY --chown=opengaterag:opengaterag ./scripts/ /scripts/
 
 ENV PATH="/.venv/bin:${PATH}"
-ENV PYTHONPATH="/api"
 ENV PROMETHEUS_MULTIPROC_DIR="/tmp/prometheus_multiproc"
 ENV CONFIG_FILE="/config.yml"
 
