@@ -15,7 +15,7 @@ jobs:
     name: Build and push OpenGateRAG image
     runs-on: ubuntu-latest
     env:
-      API_IMAGE_NAME: ghcr.io/opengaterag
+      API_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/opengaterag
       IMAGE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || 'latest' }}
     outputs:
       commit_title: ${{ steps.get_head_commit_title.outputs.title }}
@@ -52,7 +52,7 @@ jobs:
     needs: build-opengaterag
     uses: ./.github/workflows/trivy-scan.yml
     with:
-      image-name: ghcr.io/opengaterag
+      image-name: ghcr.io/${{ github.repository_owner }}/opengaterag
       image-tag: ${{ github.event_name == 'release' && github.event.release.tag_name || 'latest' }}
 
   # deploy-dev:
