@@ -8,10 +8,24 @@ dump_api_diagnostics() {
   docker compose --file "${COMPOSE_FILE}" ps || true
   echo "::endgroup::"
 
-  echo "::group::API container logs"
-  docker compose --file "${COMPOSE_FILE}" logs --no-color api || true
+  echo "::group::Docker Compose logs (all services)"
+  docker compose --file "${COMPOSE_FILE}" logs --no-color || true
+  echo "::endgroup::"
+
+  echo "::group::API health probe"
+  curl -sv "http://localhost:8000/health" || true
   echo "::endgroup::"
 }
+
+on_error() {
+  exit_code=$?
+  line_no=${1:-unknown}
+  echo "start_services.sh failed (exit=${exit_code}) at line ${line_no}." >&2
+  dump_api_diagnostics
+  exit "${exit_code}"
+}
+
+trap 'on_error $LINENO' ERR
 
 if ! docker compose --file "${COMPOSE_FILE}" up --detach --wait; then
   echo "Services did not become healthy." >&2

@@ -65,6 +65,17 @@ jobs:
         ALBERT_ADMIN_API_KEY: ${{ secrets.ALBERT_ADMIN_API_KEY }}
         OPENGATELLM_MODEL_NAME: openweight-embeddings
 
+    - name: Dump Docker Compose logs on failure
+      if: failure()
+      run: |
+        echo "::group::Docker Compose status"
+        docker compose --file .github/tests/compose.yml ps || true
+        echo "::endgroup::"
+
+        echo "::group::Docker Compose logs (all services)"
+        docker compose --file .github/tests/compose.yml logs --no-color || true
+        echo "::endgroup::"
+
     - name: Run e2e tests
       run: |
         # Create a local virtual environment and install dependencies
@@ -79,3 +90,4 @@ jobs:
         OPENGATELLM_URL: http://localhost:8000
         OPENGATELLM_MODEL_NAME: openweight-embeddings
         OPENGATELLM_MODEL_VECTOR_SIZE: 1024
+        OPENGATELLM_DATABASE_URL: postgresql+asyncpg://postgres:changeme@localhost:5432/postgres

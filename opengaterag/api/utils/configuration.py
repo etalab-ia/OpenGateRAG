@@ -99,12 +99,12 @@ class ConfigBaseModel(BaseModel):
 @custom_validation_error()
 class ElasticsearchDependency(ConfigBaseModel):
     """
-    Elasticsearch is an optional dependency of OpenGateLLM. Elasticsearch is used as a vector store. If this dependency is provided, all documents endpoint are enabled.
+    Elasticsearch is a required dependency of OpenGateRAG. Elasticsearch is used as a vector store. If this dependency is provided, all documents endpoint are enabled.
     Pass all arguments of `elasticsearch.Elasticsearch` class, see https://elasticsearch-py.readthedocs.io/en/latest/api/elasticsearch.html for more information.
     Other arguments declared below are used to configure the Elasticsearch index.
     """
 
-    index_name: constr(strip_whitespace=True, min_length=1) = Field(default="opengatellm", description="Name of the Elasticsearch index.", examples=["my_index"])  # fmt: off
+    index_name: constr(strip_whitespace=True, min_length=1) = Field(default="opengaterag", description="Name of the Elasticsearch index.", examples=["my_index"])  # fmt: off
     index_language: ElasticsearchIndexLanguage = Field(default=ElasticsearchIndexLanguage.ENGLISH, description="Language of the Elasticsearch index.", examples=[ElasticsearchIndexLanguage.ENGLISH.value])  # fmt: off
     number_of_shards: int = Field(default=12, ge=1, le=75, description="Number of shards for the Elasticsearch index.", examples=[4])  # fmt: off
     number_of_replicas: int = Field(default=1, ge=0, description="Number of replicas for the Elasticsearch index.", examples=[1])  # fmt: off
@@ -125,7 +125,7 @@ class OpengateLLMDependency(ConfigBaseModel):
 @custom_validation_error()
 class PostgresDependency(ConfigBaseModel):
     """
-    Postgres is a required dependency of OpenGateLLM. In this section, you can pass all postgres python SDK arguments, see https://docs.sqlalchemy.org/en/21/core/engines.html#engine-creation-apihttps://docs.sqlalchemy.org/en/21/core/engines.html#engine-creation-api for more information.
+    Postgres is a required dependency of OpenGateRAG. In this section, you can pass all postgres python SDK arguments, see https://docs.sqlalchemy.org/en/21/core/engines.html#engine-creation-apihttps://docs.sqlalchemy.org/en/21/core/engines.html#engine-creation-api for more information.
     Only the `url` argument is required. The connection URL must use the asynchronous scheme, `postgresql+asyncpg://`. If you provide a standard `postgresql://` URL, it will be automatically converted to use asyncpg.
     """
 
@@ -194,11 +194,11 @@ class Settings(ConfigBaseModel):
     usage_tokenizer: Tokenizer = Field(default=Tokenizer.TIKTOKEN_GPT2, description="Tokenizer used to compute usage of the API.")
 
     # swagger
-    swagger_summary: str = Field(default="OpenGateLLM connect to your models. You can configuration this swagger UI in the configuration file, like hide routes or change the title.", description="Display summary of your API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.", examples=["My API description."])  # fmt: off
+    swagger_summary: str = Field(default="You can configuration this swagger UI in the configuration file, like hide routes or change the title.", description="Display summary of your API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.", examples=["My API description."])  # fmt: off
     swagger_version: str = Field(default="latest", description="Display version of your API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.", examples=["2.5.0"])  # fmt: off
-    swagger_description: str = Field(default="[See documentation](https://github.com/etalab-ia/opengatellm/blob/main/README.md)", description="Display description of your API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.", examples=["[See documentation](https://github.com/etalab-ia/opengatellm/blob/main/README.md)"])  # fmt: off
+    swagger_description: str = Field(default="[See documentation](https://github.com/etalab-ia/opengaterag/blob/main/README.md)", description="Display description of your API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.", examples=["[See documentation](https://github.com/etalab-ia/opengaterag/blob/main/README.md)"])  # fmt: off
     swagger_contact: dict | None = Field(default=None, description="Contact informations of the API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.")  # fmt: off
-    swagger_license_info: dict = Field(default={"name": "MIT Licence", "identifier": "MIT", "url": "https://raw.githubusercontent.com/etalab-ia/opengatellm/refs/heads/main/LICENSE"}, description="Licence informations of the API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.")  # fmt: off
+    swagger_license_info: dict = Field(default={"name": "MIT Licence", "identifier": "MIT", "url": "https://raw.githubusercontent.com/etalab-ia/opengaterag/refs/heads/main/LICENSE"}, description="Licence informations of the API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.")  # fmt: off
     swagger_terms_of_service: str | None = Field(default=None, description="A URL to the Terms of Service for the API in swagger UI. If provided, this has to be a URL.", examples=["https://example.com/terms-of-service"])  # fmt: off
     swagger_openapi_tags: list[dict[str, str | dict[str, str]]] = Field(default_factory=list, description="OpenAPI tags of the API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.", json_schema_extra={"default": []})  # fmt: off
     swagger_openapi_url: str = Field(default="/openapi.json", pattern=r"^/", description="OpenAPI URL of swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.")  # fmt: off

@@ -21,6 +21,9 @@
     export $(cat .env | grep -v ^# | xargs)
     ```
 
+    > [!NOTE]
+    > The database setup by `OPENGATELLM_DATABASE_URL` environment variable must be the same as the database used by the API specified in `OPENGATELLM_URL` environment variable.
+
 * Run API locally
 
     ```bash
