@@ -35,12 +35,14 @@ def create_app(
         contact=configuration.settings.swagger_contact,
         license_info=configuration.settings.swagger_license_info,
         openapi_tags=configuration.settings.swagger_openapi_tags,
-        docs_url=configuration.settings.swagger_docs_url,
-        redoc_url=configuration.settings.swagger_redoc_url,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
         lifespan=None if skip_lifespan else lifespan,
     )
     _register_routers(app, configuration)
     _setup_monitoring(app, configuration)
+    _setup_unified_docs(app, configuration)
 
     return app
 
@@ -64,6 +66,13 @@ def _setup_prometheus(app: FastAPI, include_in_schema: bool = True) -> None:
 
         data = prometheus_client.generate_latest(registry)
         return Response(content=data, media_type=prometheus_client.CONTENT_TYPE_LATEST)
+
+
+def _setup_unified_docs(app: FastAPI, configuration: Configuration) -> None:
+    from opengaterag.docs.app import create_docs_app
+
+    docs_app = create_docs_app(parent_app=app, configuration=configuration)
+    app.mount(path="/", app=docs_app)
 
 
 def _register_routers(app: FastAPI, configuration: Configuration) -> None:

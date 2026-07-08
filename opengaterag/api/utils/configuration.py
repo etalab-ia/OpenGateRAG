@@ -120,6 +120,7 @@ class OpengateLLMDependency(ConfigBaseModel):
     url: constr(strip_whitespace=True, min_length=1) = Field(..., description="URL of the OpengateLLM API.", examples=["https://opengatellm.com"])  # fmt: off
     model_name: str = Field(..., description="Model of the vector store to be used to embed the text in the vector store.", examples=["text-embedding-3-small"])  # fmt: off
     model_vector_size: int = Field(ge=1, description="Size of the vector to be used to embed the text in the vector store.", examples=[1536])  # fmt: off
+    openapi_url: str = Field(default="/openapi.json", description="Path, relative to `url`, where OpengateLLM exposes its OpenAPI schema. Used to build the unified API documentation.", examples=["/openapi.json"])  # fmt: off
 
 
 @custom_validation_error()
