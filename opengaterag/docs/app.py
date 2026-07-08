@@ -23,9 +23,10 @@ def create_docs_app(parent_app: FastAPI, configuration: Configuration) -> FastAP
     OpenGateRAG schema is served so the documentation never fully breaks.
     """
     settings = configuration.settings
-    opengatellm_url = configuration.dependencies.opengatellm.url.rstrip("/")
+    opengatellm_private_url = configuration.dependencies.opengatellm.url.rstrip("/")
+    opengatellm_public_url = (configuration.dependencies.opengatellm.public_url or opengatellm_private_url).rstrip("/")
     opengatellm_openapi_path = configuration.dependencies.opengatellm.openapi_url.lstrip("/")
-    opengatellm_openapi_url = f"{opengatellm_url}/{opengatellm_openapi_path}"
+    opengatellm_openapi_url = f"{opengatellm_private_url}/{opengatellm_openapi_path}"
 
     docs_app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     cache: dict[str, object] = {"schema": None, "expires_at": 0.0}
@@ -41,7 +42,7 @@ def create_docs_app(parent_app: FastAPI, configuration: Configuration) -> FastAP
             merged = merge_openapi_schemas(
                 base=base_schema,
                 secondary=secondary_schema,
-                secondary_server_url=opengatellm_url,
+                secondary_server_url=opengatellm_public_url,
             )
         except httpx.HTTPError as error:
             logger.warning(f"Unable to fetch OpenGateLLM OpenAPI schema from {opengatellm_openapi_url}: {error}")

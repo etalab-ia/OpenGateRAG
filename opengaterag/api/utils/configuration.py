@@ -4,9 +4,9 @@ import logging
 import os
 from pathlib import Path
 import re
-from typing import Any, Literal, get_args, get_origin
+from typing import Annotated, Any, Literal, get_args, get_origin
 
-from pydantic import BaseModel, ConfigDict, Field, constr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from pydantic import ValidationError as PydanticValidationError
 from pydantic_settings import BaseSettings
 import yaml
@@ -104,11 +104,11 @@ class ElasticsearchDependency(ConfigBaseModel):
     Other arguments declared below are used to configure the Elasticsearch index.
     """
 
-    index_name: constr(strip_whitespace=True, min_length=1) = Field(default="opengaterag", description="Name of the Elasticsearch index.", examples=["my_index"])  # fmt: off
-    index_language: ElasticsearchIndexLanguage = Field(default=ElasticsearchIndexLanguage.ENGLISH, description="Language of the Elasticsearch index.", examples=[ElasticsearchIndexLanguage.ENGLISH.value])  # fmt: off
-    number_of_shards: int = Field(default=12, ge=1, le=75, description="Number of shards for the Elasticsearch index.", examples=[4])  # fmt: off
-    number_of_replicas: int = Field(default=1, ge=0, description="Number of replicas for the Elasticsearch index.", examples=[1])  # fmt: off
-    refresh_interval: constr(strip_whitespace=True, pattern=r"^(-1|\d+(ms|s|m|h|d))$") = Field(default="1s", description="Refresh interval for the Elasticsearch index", examples=["2s"])  # fmt: off
+    index_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(default="opengaterag", description="Name of the Elasticsearch index.", examples=["my_index"])  # fmt: off
+    index_language: Annotated[ElasticsearchIndexLanguage, Field(default=ElasticsearchIndexLanguage.ENGLISH, description="Language of the Elasticsearch index.", examples=[ElasticsearchIndexLanguage.ENGLISH.value])]  # fmt: off
+    number_of_shards: Annotated[int, Field(default=12, ge=1, le=75, description="Number of shards for the Elasticsearch index.", examples=[4])]
+    number_of_replicas: Annotated[int, Field(default=1, ge=0, description="Number of replicas for the Elasticsearch index.", examples=[1])]
+    refresh_interval: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^(-1|\d+(ms|s|m|h|d))$")] = Field(default="1s", description="Refresh interval for the Elasticsearch index", examples=["2s"])  # fmt: off
 
 
 @custom_validation_error()
@@ -117,10 +117,17 @@ class OpengateLLMDependency(ConfigBaseModel):
     OpengateLLM is a required dependency of OpenGateLLM. It is used to connect to the OpengateLLM API.
     """
 
-    url: constr(strip_whitespace=True, min_length=1) = Field(..., description="URL of the OpengateLLM API.", examples=["https://opengatellm.com"])  # fmt: off
-    model_name: str = Field(..., description="Model of the vector store to be used to embed the text in the vector store.", examples=["text-embedding-3-small"])  # fmt: off
-    model_vector_size: int = Field(ge=1, description="Size of the vector to be used to embed the text in the vector store.", examples=[1536])  # fmt: off
-    openapi_url: str = Field(default="/openapi.json", description="Path, relative to `url`, where OpengateLLM exposes its OpenAPI schema. Used to build the unified API documentation.", examples=["/openapi.json"])  # fmt: off
+    url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(..., description="URL of the OpengateLLM API.", examples=["https://opengatellm.com"])  # fmt: off
+    model_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(..., description="Model of the vector store to be used to embed the text in the vector store.", examples=["text-embedding-3-small"])  # fmt: off
+    model_vector_size: Annotated[int, Field(ge=1, description="Size of the vector to be used to embed the text in the vector store.", examples=[1536])]  # fmt: off
+    public_url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = Field(default=None, description="Public URL of the OpengateLLM API to run swagger UI without CORS issues. If not provided, the public URL will be the same as the `url`.")  # fmt: off
+    openapi_url: Annotated[str, Field(default="/openapi.json", description="Path, relative to `url`, where OpengateLLM exposes its OpenAPI schema. Used to build the unified API documentation.", examples=["/openapi.json"])]  # fmt: off
+
+    @field_validator("public_url", mode="after")
+    def set_public_url(cls, public_url: str | None) -> str:
+        if public_url is None:
+            return cls.url
+        return public_url
 
 
 @custom_validation_error()
@@ -130,15 +137,7 @@ class PostgresDependency(ConfigBaseModel):
     Only the `url` argument is required. The connection URL must use the asynchronous scheme, `postgresql+asyncpg://`. If you provide a standard `postgresql://` URL, it will be automatically converted to use asyncpg.
     """
 
-    url: constr(strip_whitespace=True, min_length=1) = Field(..., pattern=r"^postgresql", description="PostgreSQL connection url.", examples=["postgresql+asyncpg://postgres:changeme@localhost:5432/postgres"])  # fmt: off
-
-    @field_validator("url", mode="after")
-    def force_async(cls, url):
-        if url.startswith("postgresql://"):
-            logging.warning(msg="PostgreSQL connection must be async, force asyncpg connection.")
-            url = url.replace("postgresql://", "postgresql+asyncpg://")
-
-        return url
+    url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, pattern=r"^postgresql\+asyncpg://")] = Field(..., description="PostgreSQL connection url.", examples=["postgresql+asyncpg://postgres:changeme@localhost:5432/postgres"])  # fmt: off
 
 
 @custom_validation_error()

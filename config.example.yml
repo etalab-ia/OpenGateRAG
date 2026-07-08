@@ -2,7 +2,7 @@
 dependencies:
   opengatellm:
     url: ${OPENGATELLM_URL:-http://localhost:8000}
-    model_name: ${OPENGATELLM_MODEL_NAME:-openweight-embedding}
+    model_name: ${OPENGATELLM_MODEL_NAME:-openweight-embeddings}
     model_vector_size: ${OPENGATELLM_MODEL_VECTOR_SIZE:-1024}
     # openapi_url: /openapi.json
 
@@ -42,4 +42,3 @@ settings:
   # swagger_redoc_url: /redoc
 
   # monitoring_sentry_enabled: True
-  # monitoring_prometheus_enabled: True

@@ -221,3 +221,4 @@ __marimo__/
 config.yml
 .DS_Store
 compose.yml
+uv.lock
