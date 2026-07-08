@@ -3,8 +3,8 @@ name: Testing
 on:
   pull_request:
     branches: [ main ]
-    # paths:
-    #   - "opengaterag/api/**"
+    paths:
+      - "opengaterag/api/**"
   workflow_call: # Add this to make the workflow reusable
   workflow_dispatch: # Add this to allow manual triggering
 
