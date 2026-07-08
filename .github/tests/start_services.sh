@@ -1,6 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+COMPOSE_FILE=".github/tests/compose.yml"
+
+dump_api_diagnostics() {
+  echo "::group::Docker Compose status"
+  docker compose --file "${COMPOSE_FILE}" ps || true
+  echo "::endgroup::"
+
+  echo "::group::API container logs"
+  docker compose --file "${COMPOSE_FILE}" logs --no-color api || true
+  echo "::endgroup::"
+}
+
+if ! docker compose --file "${COMPOSE_FILE}" up --detach --wait; then
+  echo "Services did not become healthy." >&2
+  dump_api_diagnostics
+  exit 1
+fi
+
 login_token="$(
   curl -sf -X POST "http://localhost:8000/v1/auth/login" \
     -H "Content-Type: application/json" \
@@ -19,15 +37,21 @@ admin_api_key="$(
 router_id="$(
   curl -sf "http://localhost:8000/v1/admin/routers?limit=100" \
     -H "Authorization: Bearer ${admin_api_key}" \
-    | jq -r '.data[] | select(.name == "BAAI/bge-m3") | .id' \
+    | jq -r '.data[] | select(.name == "openweight-embeddings") | .id' \
     | head -n1
 )"
+
 
 role_id="$(
   curl -sf -X POST "http://localhost:8000/v1/admin/roles" \
     -H "Authorization: Bearer ${admin_api_key}" \
     -H "Content-Type: application/json" \
-    -d "{\"name\":\"user\",\"permissions\":[],\"limits\":[{\"router_id\":${router_id},\"type\":\"tpm\",\"value\":0}]}" \
+    -d "{\"name\":\"user\",\"permissions\":[],\"limits\":[
+      {\"router_id\":${router_id},\"type\":\"tpm\",\"value\":null},
+      {\"router_id\":${router_id},\"type\":\"tpd\",\"value\":null},
+      {\"router_id\":${router_id},\"type\":\"rpm\",\"value\":null},
+      {\"router_id\":${router_id},\"type\":\"rpd\",\"value\":null}
+    ]}" \
     | jq -r '.id'
 )"
 

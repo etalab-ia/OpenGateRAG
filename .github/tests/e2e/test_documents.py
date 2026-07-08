@@ -1,5 +1,5 @@
 import json
-import os
+from pathlib import Path
 from time import sleep
 from uuid import uuid4
 
@@ -10,6 +10,8 @@ from opengaterag.api.schemas.chunks import Chunks
 from opengaterag.api.schemas.collections import CollectionVisibility
 from opengaterag.api.schemas.documents import Document, Documents
 from opengaterag.api.utils.variables import EndpointRoute
+
+PDF_ASSET = Path(__file__).parent / "assets" / "pdf.pdf"
 
 
 @pytest.fixture(scope="module")
@@ -26,10 +28,9 @@ def collection(user_client: TestClient, admin_client: TestClient):
 
 @pytest.fixture(scope="function")
 def document(user_client: TestClient, collection: int):
-    file_path = "opengaterag/api/tests/e2e/assets/pdf.pdf"
-    with open(file_path, "rb") as file:
-        files = {"file": (os.path.basename(file_path), file, "application/pdf")}
-        response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data={"collection": str(collection)}, files=files)
+    with open(PDF_ASSET, "rb") as file:
+        files = {"file": (PDF_ASSET.name, file, "application/pdf")}
+        response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data={"collection_id": str(collection)}, files=files)
         file.close()
     assert response.status_code == 201, response.text
     document_id = response.json()["id"]
@@ -42,10 +43,8 @@ def document(user_client: TestClient, collection: int):
 @pytest.mark.usefixtures("user_client", "admin_client", "collection")
 class TestDocuments:
     def test_upload_file_with_metadata(self, user_client: TestClient, collection: int):
-        file_path = "opengaterag/api/tests/e2e/assets/pdf.pdf"
-
         data = {  # with metadata
-            "collection": str(collection),
+            "collection_id": str(collection),
             "chunk_size": "1000",
             "chunk_overlap": "200",
             "chunk_min_size": "0",
@@ -53,8 +52,8 @@ class TestDocuments:
             "metadata": json.dumps({"source_title": "test", "source_tags": "tag-1,tag-2"}),
         }
 
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
         assert response.status_code == 201, response.text
@@ -68,7 +67,7 @@ class TestDocuments:
         assert document.id == document_id
         assert document.chunks > 0
         nb_chunks = document.chunks
-        assert document.name == file_path.split("/")[-1]
+        assert document.name == PDF_ASSET.name
 
         response = user_client.get(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}/chunks", params={"limit": nb_chunks})
         assert response.status_code == 200, response.text
@@ -82,10 +81,8 @@ class TestDocuments:
         assert chunks.data[0].metadata == {"source_title": "test", "source_tags": "tag-1,tag-2"}
 
     def test_upload_file_with_overwrite_name(self, user_client: TestClient, admin_client: TestClient, collection):
-        file_path = "opengaterag/api/tests/e2e/assets/pdf.pdf"
-
         data = {  # with metadata
-            "collection": str(collection),
+            "collection_id": str(collection),
             "name": "test_document.pdf",
             "chunk_size": "1000",
             "chunk_overlap": "200",
@@ -94,8 +91,8 @@ class TestDocuments:
             "metadata": json.dumps({"source_title": "test", "source_tags": "tag-1,tag-2"}),
         }
 
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
         assert response.status_code == 201, response.text
@@ -111,15 +108,14 @@ class TestDocuments:
         assert document.chunks > 0
 
     def test_upload_file_disable_chunking(self, user_client: TestClient, admin_client: TestClient, collection):
-        file_path = "opengaterag/api/tests/e2e/assets/pdf.pdf"
         data = {
-            "collection": str(collection),
+            "collection_id": str(collection),
             "disable_chunking": "true",
             "chunk_size": "10",
             "metadata": json.dumps({"source_title": "test", "source_tags": "tag-1,tag-2"}),
         }
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.seek(0)
             file.close()
@@ -144,7 +140,7 @@ class TestDocuments:
 
     def test_create_document_without_file(self, user_client: TestClient, admin_client: TestClient, collection):
         data = {
-            "collection": str(collection),
+            "collection_id": str(collection),
             "name": "test_document.pdf",
             "metadata": json.dumps({"source_title": "test", "source_tags": "tag-1,tag-2"}),
         }
@@ -161,17 +157,15 @@ class TestDocuments:
 
     def test_create_document_without_name_and_file(self, user_client: TestClient, admin_client: TestClient, collection):
         data = {
-            "collection": str(collection),
+            "collection_id": str(collection),
             "metadata": json.dumps({"source_title": "test", "source_tags": "tag-1,tag-2"}),
         }
         response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data)
         assert response.status_code == 422, response.text
 
     def test_post_document_empty_metadata(self, user_client: TestClient, admin_client: TestClient, collection):
-        file_path = "opengaterag/api/tests/e2e/assets/pdf.pdf"
-
         data = {  # with metadata
-            "collection": str(collection),
+            "collection_id": str(collection),
             "output_format": "markdown",
             "force_ocr": "false",
             "chunk_size": "1000",
@@ -183,8 +177,8 @@ class TestDocuments:
             "is_separator_regex": "false",
         }
 
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
 
@@ -192,8 +186,8 @@ class TestDocuments:
 
         data["metadata"] = ""
 
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
 
@@ -201,8 +195,8 @@ class TestDocuments:
 
         data["metadata"] = None
 
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
 
@@ -210,18 +204,16 @@ class TestDocuments:
 
         data["metadata"] = "{}"
 
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
 
         assert response.status_code == 422, response.text
 
     def test_post_document_invalid_metadata_malformed(self, user_client: TestClient, admin_client: TestClient, collection):
-        file_path = "opengaterag/api/tests/e2e/assets/pdf.pdf"
-
         data = {  # with metadata
-            "collection": str(collection),
+            "collection_id": str(collection),
             "output_format": "markdown",
             "force_ocr": "false",
             "chunk_size": "1000",
@@ -234,18 +226,16 @@ class TestDocuments:
             "metadata": "{test}",
         }
 
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
 
         assert response.status_code == 422, response.text
 
     def test_post_document_invalid_metadata_str_too_long(self, user_client: TestClient, admin_client: TestClient, collection):
-        file_path = "opengaterag/api/tests/e2e/assets/pdf.pdf"
-
         data = {  # with metadata
-            "collection": str(collection),
+            "collection_id": str(collection),
             "output_format": "markdown",
             "force_ocr": "false",
             "chunk_size": "1000",
@@ -258,8 +248,8 @@ class TestDocuments:
             "metadata": json.dumps({"source_title": "o" * 300}),
         }
 
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
 
@@ -267,10 +257,8 @@ class TestDocuments:
 
     def test_get_documents(self, user_client: TestClient, admin_client: TestClient, collection):
         # Create document
-        file_path = "opengaterag/api/tests/e2e/assets/pdf.pdf"
-
         data = {  # with empty metadata
-            "collection": str(collection),
+            "collection_id": str(collection),
             "output_format": "markdown",
             "force_ocr": "false",
             "chunk_size": "1000",
@@ -283,8 +271,8 @@ class TestDocuments:
             "is_separator_regex": "false",
         }
 
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
 
@@ -297,7 +285,7 @@ class TestDocuments:
         documents = response.json()
         Documents(**documents)  # test output format
 
-        response = user_client.get(url=f"/v1{EndpointRoute.DOCUMENTS}", params={"collection": collection})
+        response = user_client.get(url=f"/v1{EndpointRoute.DOCUMENTS}", params={"collection_id": collection})
         assert response.status_code == 200, response.text
 
         documents = response.json()
@@ -311,10 +299,8 @@ class TestDocuments:
 
     def test_delete_document(self, user_client: TestClient, admin_client: TestClient, collection):
         # Create document
-        file_path = "opengaterag/api/tests/e2e/assets/pdf.pdf"
-
         data = {  # without metadata
-            "collection": str(collection),
+            "collection_id": str(collection),
             "output_format": "markdown",
             "force_ocr": "false",
             "chunk_size": "1000",
@@ -327,8 +313,8 @@ class TestDocuments:
             "is_separator_regex": "false",
         }
 
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
 
@@ -343,7 +329,7 @@ class TestDocuments:
 
     def test_create_chunks_into_empty_document(self, user_client: TestClient, admin_client: TestClient, collection):
         data = {
-            "collection": str(collection),
+            "collection_id": str(collection),
             "name": "test_document.pdf",
             "metadata": json.dumps({"source_title": "test", "source_tags": "tag-1,tag-2"}),
         }
@@ -388,13 +374,12 @@ class TestDocuments:
         assert chunks.data[1].metadata == {"source_title": "test_2", "source_tags": "tag-1,tag-2"}
 
     def test_create_chunks_into_document_with_content(self, user_client: TestClient, admin_client: TestClient, collection):
-        file_path = "opengaterag/api/tests/e2e/assets/pdf.pdf"
         data = {
-            "collection": str(collection),
+            "collection_id": str(collection),
             "name": "test_document.pdf",
         }
-        with open(file_path, "rb") as file:
-            files = {"file": (os.path.basename(file_path), file, "application/pdf")}
+        with open(PDF_ASSET, "rb") as file:
+            files = {"file": (PDF_ASSET.name, file, "application/pdf")}
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
             file.close()
         assert response.status_code == 201, response.text

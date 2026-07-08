@@ -33,7 +33,7 @@ services:
     environment:
       - ALBERT_ADMIN_API_KEY=${ALBERT_ADMIN_API_KEY}
     volumes:
-      - ".github/tests/config.yml:/config.yml:ro"
+      - "./config.opengatellm.yml:/config.yml:ro"
     healthcheck:
         test: [ "CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1" ]
         interval: 4s

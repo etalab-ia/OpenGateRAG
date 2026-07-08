@@ -2,6 +2,8 @@
 
 !opengaterag/
 !opengaterag/api/**
+!scripts/
+!scripts/**
 !.github/
 !pyproject.toml
 !config.example.yml

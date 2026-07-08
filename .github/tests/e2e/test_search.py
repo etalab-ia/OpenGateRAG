@@ -1,5 +1,4 @@
 import logging
-from time import sleep
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -41,7 +40,7 @@ def document_id(user_client: TestClient, collection_id: int):
 
 
 @pytest.fixture(scope="function")
-def chunks_ids(user_client: TestClient, document_id: int):
+def chunks_ids(user_client: TestClient, document_id: int, es_refresh):
     data = {
         "chunks": [
             {"content": "Qui est Albert ?", "metadata": {"source_title": "test", "source_page": "1"}},
@@ -52,7 +51,7 @@ def chunks_ids(user_client: TestClient, document_id: int):
     response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}/chunks", json=data)
     assert response.status_code == 201, response.text
     chunk_ids = response.json()["ids"]
-    sleep(2)
+    es_refresh()
 
     yield chunk_ids
 
@@ -60,7 +59,7 @@ def chunks_ids(user_client: TestClient, document_id: int):
 @pytest.mark.usefixtures("user_client", "admin_client", "collection_id", "document_id", "chunks_ids")
 class TestSearch:
     @staticmethod
-    def _create_document_with_chunk(user_client: TestClient, collection_id: int, chunks: list[dict] = []) -> int:
+    def _create_document_with_chunk(user_client: TestClient, collection_id: int, es_refresh, chunks: list[dict] = []) -> int:
         response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data={"collection_id": collection_id, "name": "test.pdf"})
         assert response.status_code == 201, response.text
         document_id = response.json()["id"]
@@ -68,7 +67,7 @@ class TestSearch:
         if chunks:
             response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}/chunks", json={"chunks": chunks})
             assert response.status_code == 201, response.text
-            sleep(2)
+            es_refresh()
 
         return document_id
 
@@ -104,10 +103,10 @@ class TestSearch:
         assert searches.data[0].chunk.id == second_chunk_id
         assert first_chunk_id not in [search.chunk.id for search in searches.data]
 
-    def test_search_with_legacy_query_argument(self, user_client: TestClient, admin_client: TestClient):
-        """Test POST /search with a legacy query argument."""
+    def test_search_with_query(self, user_client: TestClient, admin_client: TestClient):
+        """Test POST /search with a query argument."""
 
-        data = {"prompt": "Voltaire", "limit": 1}
+        data = {"query": "Voltaire", "limit": 1}
         response = user_client.post(url=f"/v1{EndpointRoute.SEARCH}", json=data)
         assert response.status_code == 200, response.text
         searches = Searches(**response.json())
@@ -147,13 +146,14 @@ class TestSearch:
         response = user_client.post(url=f"/v1{EndpointRoute.SEARCH}", json=data)
         assert response.status_code == 422, response.text
 
-    def test_search_with_collection_ids_filter(self, user_client: TestClient, collection_id: int):
+    def test_search_with_collection_ids_filter(self, user_client: TestClient, collection_id: int, es_refresh):
         # create a collection, document and chunks
         response = user_client.post(url=f"/v1{EndpointRoute.COLLECTIONS}", json={"name": f"test_collection_{uuid4()}"})
         assert response.status_code == 201, response.text
         second_collection_id = response.json()["id"]
 
-        self._create_document_with_chunk(user_client=user_client, collection_id=second_collection_id, chunks=[{"content": "Test"}])
+        self._create_document_with_chunk(user_client=user_client, collection_id=second_collection_id, es_refresh=es_refresh, chunks=[{"content": "Test"}])
+        es_refresh()
 
         data = {"query": "Test", "limit": 100}
         response = user_client.post(url=f"/v1{EndpointRoute.SEARCH}", json=data)
@@ -169,17 +169,9 @@ class TestSearch:
         assert collection_id in [search.chunk.collection_id for search in searches.data]
         assert second_collection_id not in [search.chunk.collection_id for search in searches.data]
 
-        # legacy alias: collections
-        data = {"query": "Test", "collections": [collection_id], "limit": 10}
-        response = user_client.post(url=f"/v1{EndpointRoute.SEARCH}", json=data)
-        assert response.status_code == 200, response.text
-        searches = Searches(**response.json())
-        assert collection_id in [search.chunk.collection_id for search in searches.data]
-        assert second_collection_id not in [search.chunk.collection_id for search in searches.data]
-
-    def test_search_with_document_ids_filter(self, user_client: TestClient, admin_client: TestClient, collection_id: int, document_id: int):
+    def test_search_with_document_ids_filter(self, user_client: TestClient, admin_client: TestClient, collection_id: int, document_id: int, es_refresh):
         # create a document and chunks
-        second_document_id = self._create_document_with_chunk(user_client=user_client, collection_id=collection_id, chunks=[{"content": "Test"}])
+        second_document_id = self._create_document_with_chunk(user_client=user_client, collection_id=collection_id, es_refresh=es_refresh, chunks=[{"content": "Test"}])
 
         data = {"query": "Test", "document_ids": [document_id], "limit": 10}
         response = user_client.post(url=f"/v1{EndpointRoute.SEARCH}", json=data)
@@ -205,12 +197,14 @@ class TestSearch:
         user_client: TestClient,
         collection_id: int,
         document_id: int,
+        es_refresh,
         filter_type: str,
         filter_value: str | int,
     ):
         second_document_id = self._create_document_with_chunk(
             user_client=user_client,
             collection_id=collection_id,
+            es_refresh=es_refresh,
             chunks=[
                 {"content": "Qui est Test Secondary ?", "metadata": {"source_title": "secondary title", "source_page": 1}},
                 {"content": "Qui est Test Secondary ?", "metadata": {"source_title": "secondary title", "source_page": 1}},
@@ -230,10 +224,11 @@ class TestSearch:
         assert all(search.chunk.document_id == second_document_id for search in searches.data)
         assert document_id not in [search.chunk.document_id for search in searches.data]
 
-    def test_search_with_metadata_compound_filter_and(self, user_client: TestClient, admin_client: TestClient, collection_id: int, document_id: int):
+    def test_search_with_metadata_compound_filter_and(self, user_client: TestClient, admin_client: TestClient, collection_id: int, document_id: int, es_refresh):
         second_document_id = self._create_document_with_chunk(
             user_client=user_client,
             collection_id=collection_id,
+            es_refresh=es_refresh,
             chunks=[
                 {"content": "Qui est Test Secondary ?", "metadata": {"source_title": "test", "source_page": "42"}},
                 {"content": "Qui est Test Secondary ?", "metadata": {"source_title": "test", "source_page": "42"}},
@@ -260,10 +255,11 @@ class TestSearch:
         assert all(search.chunk.document_id == second_document_id for search in searches.data)
         assert document_id not in [search.chunk.document_id for search in searches.data]
 
-    def test_search_with_metadata_compound_filter_or(self, user_client: TestClient, admin_client: TestClient, collection_id: int):
+    def test_search_with_metadata_compound_filter_or(self, user_client: TestClient, admin_client: TestClient, collection_id: int, es_refresh):
         second_document_id = self._create_document_with_chunk(
             user_client=user_client,
             collection_id=collection_id,
+            es_refresh=es_refresh,
             chunks=[
                 {"content": "Qui est Test Secondary ?", "metadata": {"source_title": "test", "source_page": "42"}},
                 {"content": "Qui est Test Secondary ?", "metadata": {"source_title": "test", "source_page": "42"}},
