@@ -7,3 +7,11 @@ CVE-2026-42496 exp:2026-09-01
 # expressions on 32-bit builds...
 # https://avd.aquasec.com/nvd/cve-2026-8376
 CVE-2026-8376 exp:2026-09-01
+
+# perl-base: perl: Perl: Incorrect regular expression processing via large regular expressions
+# https://avd.aquasec.com/nvd/cve-2026-13221
+CVE-2026-13221 exp:2026-09-01
+
+# perl-base: Storable versions before 3.41 for Perl have a signed integer overflow ...
+# https://avd.aquasec.com/nvd/cve-2026-57433
+CVE-2026-57433 exp:2026-09-01

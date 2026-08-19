@@ -9,15 +9,16 @@ from fastapi import HTTPException, UploadFile
 import httpx
 from langchain_text_splitters import RecursiveCharacterTextSplitter as LangChainRecursiveCharacterTextSplitter
 from sqlalchemy import Integer, cast, delete, distinct, func, insert, or_, select, text, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from opengaterag.api.schemas.chunks import Chunk, ChunkMetadata, InputChunk
 from opengaterag.api.schemas.collections import Collection, CollectionVisibility
-from opengaterag.api.schemas.core import PermissionType
 from opengaterag.api.schemas.documents import Document, PresetSeparators
 from opengaterag.api.schemas.search import ComparisonFilter, CompoundFilter, Search, SearchMethod
 from opengaterag.api.schemas.usage import Usage
+from opengaterag.api.utils.configuration import configuration
 from opengaterag.api.utils.context import RequestContext, global_context
 from opengaterag.api.utils.elasticsearch import ElasticsearchChunk
 from opengaterag.api.utils.exceptions import (
@@ -33,7 +34,6 @@ from opengaterag.api.utils.exceptions import (
 )
 from opengaterag.api.utils.sql import Collection as CollectionTable
 from opengaterag.api.utils.sql import Document as DocumentTable
-from opengaterag.api.utils.sql import Role as RoleTable
 from opengaterag.api.utils.sql import User as UserTable
 
 from ._elasticsearchvectorstore import ElasticsearchVectorStore
@@ -54,12 +54,21 @@ class DocumentManager:
     async def create_collection(
         postgres_session: AsyncSession,
         user_id: int,
-        user_permissions: list[str],
         name: str,
         visibility: CollectionVisibility,
         description: str | None = None,
     ) -> int:
-        if visibility == CollectionVisibility.PUBLIC and not PermissionType.can_create_public_collection(user_permissions):
+
+        insert_user = pg_insert(UserTable).values(id=user_id, storage_limit=configuration.settings.storage_default_limit)
+        statement = insert_user.on_conflict_do_update(
+            index_elements=[UserTable.id],
+            set_={"id": insert_user.excluded.id},
+        ).returning(UserTable)
+
+        result = await postgres_session.execute(statement)
+        user = result.scalar_one()
+
+        if visibility == CollectionVisibility.PUBLIC and not user.create_public_collection:
             raise InsufficientPermissionException()
         query = (
             insert(table=CollectionTable)
@@ -100,13 +109,15 @@ class DocumentManager:
     async def update_collection(
         postgres_session: AsyncSession,
         user_id: int,
-        user_permissions: list[PermissionType],
         collection_id: int,
         name: str | None = None,
         visibility: CollectionVisibility | None = None,
         description: str | None = None,
     ) -> None:
-        if visibility == CollectionVisibility.PUBLIC and not PermissionType.can_create_public_collection(user_permissions):
+        result = await postgres_session.execute(statement=select(UserTable).where(UserTable.id == user_id))
+        user = result.scalar_one()
+
+        if visibility == CollectionVisibility.PUBLIC and not user.create_public_collection:
             raise InsufficientPermissionException()
 
         # check if collection exists
@@ -149,7 +160,7 @@ class DocumentManager:
             select(
                 CollectionTable.id,
                 CollectionTable.name,
-                UserTable.email.label("owner"),
+                UserTable.id.label("owner"),
                 CollectionTable.visibility,
                 CollectionTable.description,
                 func.count(distinct(DocumentTable.id)).label("documents"),
@@ -159,7 +170,7 @@ class DocumentManager:
             )
             .outerjoin(DocumentTable, CollectionTable.id == DocumentTable.collection_id)
             .outerjoin(UserTable, CollectionTable.user_id == UserTable.id)
-            .group_by(CollectionTable.id, UserTable.email)
+            .group_by(CollectionTable.id, UserTable.id)
             .offset(offset=offset)
             .order_by(text(f"{order_by} {order_direction}"))  # nosemgrep
             .limit(limit=limit)
@@ -626,15 +637,14 @@ class DocumentManager:
     async def _get_storage_limit_and_consumption(self, postgres_session: AsyncSession, user_id: int) -> tuple[int | None, int]:
         statement = (
             select(
-                RoleTable.storage_limit,
+                UserTable.storage_limit,
                 func.coalesce(func.sum(DocumentTable.size), 0).label("storage_consumption"),
             )
             .select_from(UserTable)
-            .join(RoleTable, UserTable.role_id == RoleTable.id, isouter=True)
             .join(CollectionTable, CollectionTable.user_id == UserTable.id, isouter=True)
             .join(DocumentTable, DocumentTable.collection_id == CollectionTable.id, isouter=True)
             .where(UserTable.id == user_id)
-            .group_by(RoleTable.storage_limit)
+            .group_by(UserTable.storage_limit)
         )
         result = await postgres_session.execute(statement=statement)
         row = result.one_or_none()

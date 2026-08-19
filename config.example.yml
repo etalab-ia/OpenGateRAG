@@ -7,7 +7,7 @@ dependencies:
     # openapi_url: /openapi.json
 
   postgres:
-    url: ${OPENGATELLM_DATABASE_URL:-postgresql+asyncpg://postgres:changeme@localhost:5432/postgres}
+    url: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-changeme}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
     echo: False
     pool_size: 5
     connect_args:
@@ -28,6 +28,8 @@ dependencies:
 
 # ---------------------------------- settings -----------------------------------
 settings:
+  # storage_default_limit:  # unlimited by default
+  # storage_compute_tokenizer: tiktoken_gpt2  # default tokenizer
   # disabled_routers: ["collections"]
   # hidden_routers: ["documents"]
   # app_title: My OpenGateRAG API

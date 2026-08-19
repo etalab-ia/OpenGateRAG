@@ -178,6 +178,10 @@ class Settings(ConfigBaseModel):
     # document_parsing
     document_parsing_max_concurrent: int = Field(default=10, ge=1, description="Maximum number of concurrent document parsing tasks per worker.")  # fmt: off
 
+    # storage
+    storage_default_limit: int | None = Field(default=None, ge=0, description="Default storage limit in tokens assigned to newly created users. If null, new users have no storage limit.")  # fmt: off
+    storage_compute_tokenizer: Tokenizer = Field(default=Tokenizer.TIKTOKEN_GPT2, description="Tokenizer used to compute storage usage of the API.")
+
     # general
     disabled_routers: list[RouterName] = Field(default_factory=list, description="Disabled routers to limits services of the API.", examples=[["embeddings"]], json_schema_extra={"default": []})  # fmt: off
     hidden_routers: list[RouterName] = Field(default_factory=list, description="Routers are enabled but hidden in the swagger and the documentation of the API.", examples=[["admin"]], json_schema_extra={"default": []})  # fmt: off
@@ -189,9 +193,6 @@ class Settings(ConfigBaseModel):
 
     # monitoring
     monitoring_prometheus_enabled: bool = Field(default=True, description="If true, Prometheus metrics will be exposed in the `/metrics` endpoint.")  # fmt: off
-
-    # usage tokenizer
-    usage_tokenizer: Tokenizer = Field(default=Tokenizer.TIKTOKEN_GPT2, description="Tokenizer used to compute usage of the API.")
 
     # swagger
     swagger_summary: str = Field(default="You can configuration this swagger UI in the configuration file, like hide routes or change the title.", description="Display summary of your API in swagger UI, see https://fastapi.tiangolo.com/tutorial/metadata for more information.", examples=["My API description."])  # fmt: off
