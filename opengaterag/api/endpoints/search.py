@@ -35,7 +35,7 @@ async def search(
     """
     Get relevant chunks from the collections and a query.
     """
-    data = await document_manager.search_chunks(
+    data, usage = await document_manager.search_chunks(
         postgres_session=postgres_session,
         elasticsearch_vector_store=elasticsearch_vector_store,
         elasticsearch_client=elasticsearch_client,
@@ -50,6 +50,6 @@ async def search(
         rff_k=body.rff_k,
         score_threshold=body.score_threshold,
     )
-    content = Searches(data=data)
+    content = Searches(data=data, usage=usage)
 
     return JSONResponse(content=content.model_dump(mode="json"), status_code=200)
