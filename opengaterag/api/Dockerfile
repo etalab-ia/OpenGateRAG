@@ -42,6 +42,7 @@ WORKDIR /app
 
 # Copy application from builder
 COPY --from=builder --chown=opengaterag:opengaterag /.venv /.venv
+COPY --from=builder --chown=opengaterag:opengaterag /app/opengaterag /app/opengaterag
 COPY --chown=opengaterag:opengaterag ./scripts/ /scripts/
 
 ENV PATH="/.venv/bin:${PATH}"

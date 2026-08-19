@@ -11,13 +11,13 @@ from starlette.datastructures import Headers
 from opengaterag.api.helpers._documentmanager import DocumentManager
 from opengaterag.api.schemas.chunks import Chunk
 from opengaterag.api.schemas.collections import CollectionVisibility
-from opengaterag.api.schemas.core import PermissionType
 from opengaterag.api.schemas.search import SearchMethod
 from opengaterag.api.utils.context import RequestContext, global_context
 from opengaterag.api.utils.exceptions import (
     ChunkingFailedException,
     CollectionNotFoundException,
     DocumentNotFoundException,
+    InsufficientPermissionException,
     ParsingDocumentFailedException,
     VectorizationFailedException,
 )
@@ -37,9 +37,8 @@ def make_document_manager(parser_manager=None) -> DocumentManager:
 def make_request_context(
     user_id: int = 1,
     api_key: str = "sk-test",
-    user_permissions: list | None = None,
 ) -> ContextVar[RequestContext]:
-    ctx = RequestContext(api_key=api_key, user_id=user_id, user_permissions=user_permissions or [])
+    ctx = RequestContext(api_key=api_key, user_id=user_id)
     var: ContextVar[RequestContext] = ContextVar("test_request_context")
     var.set(ctx)
     return var
@@ -111,7 +110,7 @@ async def test_get_collections_filter_by_visibility():
     mock_private_row._asdict.return_value = {
         "id": 1,
         "name": "Private Collection",
-        "owner": "test_user",
+        "owner": 1,
         "visibility": CollectionVisibility.PRIVATE,
         "description": "A private collection",
         "documents": 5,
@@ -125,7 +124,7 @@ async def test_get_collections_filter_by_visibility():
     mock_public_row._asdict.return_value = {
         "id": 2,
         "name": "Public Collection",
-        "owner": "test_user",
+        "owner": 1,
         "visibility": CollectionVisibility.PUBLIC,
         "description": "A public collection",
         "documents": 10,
@@ -173,7 +172,7 @@ async def test_get_collections_filter_by_collection_name():
     mock_exact_row._asdict.return_value = {
         "id": 5,
         "name": "exact_match_collection",
-        "owner": "test_user",
+        "owner": 1,
         "visibility": CollectionVisibility.PUBLIC,
         "description": "Exact match collection",
         "documents": 1,
@@ -214,23 +213,72 @@ async def test_create_collection_success():
     mock_session.execute = AsyncMock()
     mock_session.commit = AsyncMock()
 
-    mock_result = MagicMock()
-    mock_result.scalar_one.return_value = 42
-    mock_session.execute.return_value = mock_result
+    user_result = MagicMock()
+    user_result.scalar_one.return_value = MagicMock(create_public_collection=False)
+    collection_result = MagicMock()
+    collection_result.scalar_one.return_value = 42
+    mock_session.execute.side_effect = [user_result, collection_result]
 
     document_manager = make_document_manager(mock_parser)
 
     collection_id = await document_manager.create_collection(
         postgres_session=mock_session,
         user_id=1,
-        user_permissions=[],
         name="My collection",
         visibility=CollectionVisibility.PRIVATE,
         description="desc",
     )
 
     assert collection_id == 42
-    mock_session.execute.assert_called_once()
+    assert mock_session.execute.await_count == 2
+    mock_session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_create_public_collection_denied_without_permission():
+    mock_parser = AsyncMock()
+    mock_session = AsyncMock(spec=AsyncSession)
+    mock_session.execute = AsyncMock()
+    mock_session.commit = AsyncMock()
+
+    user_result = MagicMock()
+    user_result.scalar_one.return_value = MagicMock(create_public_collection=False)
+    mock_session.execute.return_value = user_result
+
+    document_manager = make_document_manager(mock_parser)
+    with pytest.raises(InsufficientPermissionException):
+        await document_manager.create_collection(
+            postgres_session=mock_session,
+            user_id=1,
+            name="Public collection",
+            visibility=CollectionVisibility.PUBLIC,
+        )
+
+    mock_session.commit.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_create_public_collection_allowed_when_user_flag_is_true():
+    mock_parser = AsyncMock()
+    mock_session = AsyncMock(spec=AsyncSession)
+    mock_session.execute = AsyncMock()
+    mock_session.commit = AsyncMock()
+
+    user_result = MagicMock()
+    user_result.scalar_one.return_value = MagicMock(create_public_collection=True)
+    collection_result = MagicMock()
+    collection_result.scalar_one.return_value = 7
+    mock_session.execute.side_effect = [user_result, collection_result]
+
+    document_manager = make_document_manager(mock_parser)
+    collection_id = await document_manager.create_collection(
+        postgres_session=mock_session,
+        user_id=1,
+        name="Public collection",
+        visibility=CollectionVisibility.PUBLIC,
+    )
+
+    assert collection_id == 7
     mock_session.commit.assert_awaited_once()
 
 
@@ -432,32 +480,32 @@ async def test_update_collection_success():
     mock_session.execute = AsyncMock()
     mock_session.commit = AsyncMock()
 
-    # Mock the select result
-    select_result = MagicMock()
+    user_result = MagicMock()
+    user_result.scalar_one.return_value = MagicMock(create_public_collection=True)
+
+    collection_result = MagicMock()
     mock_collection = MagicMock()
     mock_collection.id = 123
     mock_collection.name = "Old Name"
     mock_collection.visibility = CollectionVisibility.PRIVATE
     mock_collection.description = "Old Description"
-    select_result.scalar_one.return_value = mock_collection
+    collection_result.scalar_one.return_value = mock_collection
 
-    # Mock the update result
     update_result = MagicMock()
-    mock_session.execute.side_effect = [select_result, update_result]
+    mock_session.execute.side_effect = [user_result, collection_result, update_result]
 
     document_manager = make_document_manager(mock_parser)
 
     await document_manager.update_collection(
         postgres_session=mock_session,
         user_id=1,
-        user_permissions=[PermissionType.CREATE_PUBLIC_COLLECTION],
         collection_id=123,
         name="New Name",
         visibility=CollectionVisibility.PUBLIC,
         description="New Description",
     )
 
-    assert mock_session.execute.await_count == 2
+    assert mock_session.execute.await_count == 3
     mock_session.commit.assert_awaited_once()
 
 
@@ -469,10 +517,11 @@ async def test_update_collection_not_found():
     mock_session.execute = AsyncMock()
     mock_session.commit = AsyncMock()
 
-    # Mock NoResultFound exception
-    mock_result = MagicMock()
-    mock_result.scalar_one.side_effect = NoResultFound()
-    mock_session.execute.return_value = mock_result
+    user_result = MagicMock()
+    user_result.scalar_one.return_value = MagicMock(create_public_collection=False)
+    collection_result = MagicMock()
+    collection_result.scalar_one.side_effect = NoResultFound()
+    mock_session.execute.side_effect = [user_result, collection_result]
 
     document_manager = make_document_manager(mock_parser)
 
@@ -480,7 +529,6 @@ async def test_update_collection_not_found():
         await document_manager.update_collection(
             postgres_session=mock_session,
             user_id=1,
-            user_permissions=[],
             collection_id=999,
             name="New Name",
         )

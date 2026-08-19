@@ -7,9 +7,16 @@ from elasticsearch import AsyncElasticsearch
 from fastapi.testclient import TestClient
 import httpx
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
 
-from opengaterag.api.main import app
-from opengaterag.api.utils.configuration import configuration
+# Must be set before importing the app, which interpolates the config file.
+os.environ.setdefault("POSTGRES_DB", "opengaterag")
+
+from opengaterag.api.main import app  # noqa: E402
+from opengaterag.api.utils.configuration import configuration  # noqa: E402
+from opengaterag.api.utils.sql import User as UserTable  # noqa: E402
 
 
 def refresh_elasticsearch_index() -> None:
@@ -61,7 +68,7 @@ class AuthenticatedTestClient:
         return self._client.delete(url, **kwargs)
 
 
-def _validate_opengatellm_api_key(env_var: str, role: str) -> str:
+def _validate_opengatellm_api_key(env_var: str, role: str) -> tuple[str, int]:
     api_key = os.environ.get(env_var)
     if not api_key:
         raise ValueError(f"{env_var} is not set to run e2e tests.")
@@ -74,7 +81,30 @@ def _validate_opengatellm_api_key(env_var: str, role: str) -> str:
             response.raise_for_status()
         except Exception:
             raise ValueError(f"Failed to reach OpenGateLLM API as {role}: {response.text}")
-    return api_key
+    return api_key, response.json()["id"]
+
+
+def _upsert_ogr_user(*, user_id: int, create_public_collection: bool) -> None:
+    url = configuration.dependencies.postgres.url.replace("+asyncpg", "")
+    engine = create_engine(url)
+    try:
+        with Session(engine) as session:
+            statement = (
+                pg_insert(UserTable)
+                .values(
+                    id=user_id,
+                    create_public_collection=create_public_collection,
+                    storage_limit=configuration.settings.storage_default_limit,
+                )
+                .on_conflict_do_update(
+                    index_elements=[UserTable.id],
+                    set_={"create_public_collection": create_public_collection},
+                )
+            )
+            session.execute(statement)
+            session.commit()
+    finally:
+        engine.dispose()
 
 
 @pytest.fixture(scope="session")
@@ -108,14 +138,15 @@ def test_client(setup_elasticsearch_index) -> Generator[TestClient, None, None]:
 @pytest.fixture(scope="session")
 def user_client(test_client: TestClient) -> AuthenticatedTestClient:
     """Test client authenticated as a regular user."""
-    api_key = _validate_opengatellm_api_key("OPENGATELLM_USER_API_KEY", "user")
+    api_key, _user_id = _validate_opengatellm_api_key("OPENGATELLM_USER_API_KEY", "user")
     return AuthenticatedTestClient(client=test_client, api_key=api_key)
 
 
 @pytest.fixture(scope="session")
 def admin_client(test_client: TestClient) -> AuthenticatedTestClient:
-    """Test client authenticated as an admin user."""
-    api_key = _validate_opengatellm_api_key("OPENGATELLM_ADMIN_API_KEY", "admin")
+    """Test client authenticated as an admin user with OGR create_public_collection."""
+    api_key, user_id = _validate_opengatellm_api_key("OPENGATELLM_ADMIN_API_KEY", "admin")
+    _upsert_ogr_user(user_id=user_id, create_public_collection=True)
     return AuthenticatedTestClient(client=test_client, api_key=api_key)
 
 

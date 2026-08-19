@@ -1,7 +1,7 @@
 # -------------------------------- dependencies ---------------------------------
 dependencies:
   postgres:
-    url: postgresql+asyncpg://postgres:changeme@postgres:5432/postgres
+    url: postgresql+asyncpg://postgres:changeme@postgres:5432/opengatellm
     echo: False
     pool_size: 10
     max_overflow: 5

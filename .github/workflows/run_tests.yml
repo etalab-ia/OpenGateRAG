@@ -84,10 +84,15 @@ jobs:
 
         # Activate venv for the test run
         . .venv/bin/activate
+        alembic -c opengaterag/api/alembic.ini upgrade head
         pytest .github/tests/e2e
       env:
         CONFIG_FILE: ./config.example.yml
         OPENGATELLM_URL: http://localhost:8000
         OPENGATELLM_MODEL_NAME: openweight-embeddings
         OPENGATELLM_MODEL_VECTOR_SIZE: 1024
-        OPENGATELLM_DATABASE_URL: postgresql+asyncpg://postgres:changeme@localhost:5432/postgres
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: changeme
+        POSTGRES_DB: opengaterag
