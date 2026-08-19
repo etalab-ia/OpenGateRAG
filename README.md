@@ -5,7 +5,6 @@
 [![License](https://img.shields.io/github/license/etalab-ia/OpenGateRAG?color=green&label=license)](https://github.com/etalab-ia/OpenGateRAG/blob/main/LICENSE)
 [![Stars](https://img.shields.io/github/stars/etalab-ia/OpenGateRAG?color=yellow&label=stars)](https://github.com/etalab-ia/OpenGateRAG/stargazers)
 
-
 ## Developer mode (local API)
 
 * Install dependencies
@@ -25,22 +24,49 @@
     > The database setup by `OPENGATELLM_DATABASE_URL` environment variable must be the same
     > as the database used by the API specified in `OPENGATELLM_URL` environment variable.
 
+
+* Lauch database dependencies
+
+    ```bash
+    docker compose --file compose.example.yml up --wait --detach postgres elasticsearch
+    ```
+
+* Instantiate database
+
+    ```bash
+    alembic -c opengaterag/api/alembic.ini upgrade head
+    ```
+
 * Run API locally
 
     ```bash
     uvicorn opengaterag.api.app:app --reload
     ```
 
-## Run tests
+### Run tests
 
 * Install dependencies
 
-    ```bas
+    ```bash
     pip install ".[test]"
     ```
 
 * Run tests
 
-    ```
+    ```bash
     pytest opengaterag/api/tests/unit/
+    ```
+
+### Alembic migrations
+
+* Run migrations
+
+    ```bash
+     alembic -c opengaterag/api/alembic.ini upgrade head
+    ```
+
+* Create a new migration
+
+    ```bash
+    alembic -c opengaterag/api/alembic.ini revision --autogenerate -m "Add new column to users table"
     ```

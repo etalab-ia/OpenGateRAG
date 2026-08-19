@@ -18,4 +18,6 @@ else
   exit 1
 fi
 
+python -m alembic -c opengaterag/api/alembic.ini upgrade head
+
 exec gunicorn opengaterag.api.main:app --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --config "$GUNICORN_CONFIG" $GUNICORN_CMD_ARGS

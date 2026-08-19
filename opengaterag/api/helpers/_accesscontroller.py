@@ -34,4 +34,4 @@ class AccessController:
 
             data = response.json()
 
-        request_context.set(RequestContext(api_key=api_key.credentials, user_id=data["id"], user_permissions=data["permissions"]))
+        request_context.set(RequestContext(api_key=api_key.credentials, user_id=data["id"]))

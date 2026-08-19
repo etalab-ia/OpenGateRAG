@@ -59,7 +59,7 @@ class TestAccessController:
         mock_client.__aexit__.return_value = None
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {"id": 42, "permissions": ["admin"]}
+        mock_response.json.return_value = {"id": 42}
         mock_client.get.return_value = mock_response
         mock_client_class.return_value = mock_client
 
@@ -68,4 +68,3 @@ class TestAccessController:
         ctx = request_context.get()
         assert ctx.api_key == "sk-valid"
         assert ctx.user_id == 42
-        assert ctx.user_permissions == ["admin"]

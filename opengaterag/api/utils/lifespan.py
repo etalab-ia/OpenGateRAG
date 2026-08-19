@@ -60,7 +60,7 @@ async def create_elasticsearch_client(configuration: Configuration) -> AsyncElas
 
 
 def create_tokenizer(configuration: Configuration) -> Encoding:
-    match configuration.settings.usage_tokenizer:
+    match configuration.settings.storage_compute_tokenizer:
         case Tokenizer.TIKTOKEN_O200K_BASE:
             return tiktoken.get_encoding("o200k_base")
         case Tokenizer.TIKTOKEN_P50K_BASE:

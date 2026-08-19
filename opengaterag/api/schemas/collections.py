@@ -27,7 +27,7 @@ class Collection(BaseModel):
     object: Literal["collection"] = "collection"
     id: int
     name: str
-    owner: str
+    owner: int
     description: str | None = None
     visibility: CollectionVisibility | None = None
     created: int
