@@ -12,6 +12,7 @@ from opengaterag.api.helpers._documentmanager import DocumentManager
 from opengaterag.api.schemas.chunks import Chunk
 from opengaterag.api.schemas.collections import CollectionVisibility
 from opengaterag.api.schemas.search import SearchMethod
+from opengaterag.api.schemas.usage import Usage
 from opengaterag.api.utils.context import RequestContext, global_context
 from opengaterag.api.utils.exceptions import (
     ChunkingFailedException,
@@ -433,7 +434,7 @@ async def test_search_chunks_with_empty_collection_ids_uses_user_collections():
     mock_elasticsearch_client = AsyncMock()
     mock_parser = AsyncMock()
     document_manager = make_document_manager(mock_parser)
-    document_manager._create_embeddings = AsyncMock(return_value=[[0.1, 0.2, 0.3]])
+    document_manager._create_embeddings = AsyncMock(return_value=([[0.1, 0.2, 0.3]], Usage(prompt_tokens=3, total_tokens=3)))
 
     mock_session = AsyncMock(spec=AsyncSession)
     mock_request_context = make_request_context()
@@ -449,7 +450,7 @@ async def test_search_chunks_with_empty_collection_ids_uses_user_collections():
     mock_search_results = [MagicMock(id=1, content="result 1", score=0.9)]
     mock_elasticsearch_vector_store.search = AsyncMock(return_value=mock_search_results)
 
-    result = await document_manager.search_chunks(
+    result, usage = await document_manager.search_chunks(
         postgres_session=mock_session,
         elasticsearch_vector_store=mock_elasticsearch_vector_store,
         elasticsearch_client=mock_elasticsearch_client,
@@ -466,6 +467,7 @@ async def test_search_chunks_with_empty_collection_ids_uses_user_collections():
     )
 
     assert len(result) == 1
+    assert usage == Usage(prompt_tokens=3, total_tokens=3)
     document_manager._create_embeddings.assert_awaited_once()
     mock_elasticsearch_vector_store.search.assert_awaited_once()
     call_kwargs = mock_elasticsearch_vector_store.search.call_args.kwargs
@@ -684,7 +686,7 @@ async def test_search_chunks_with_similarity():
     mock_session = AsyncMock(spec=AsyncSession)
 
     document_manager = make_document_manager(mock_parser)
-    document_manager._create_embeddings = AsyncMock(return_value=[[0.1, 0.2, 0.3]])
+    document_manager._create_embeddings = AsyncMock(return_value=([[0.1, 0.2, 0.3]], Usage(prompt_tokens=3, total_tokens=3)))
 
     collection_result = MagicMock()
     collection_row = MagicMock()
@@ -696,7 +698,7 @@ async def test_search_chunks_with_similarity():
     mock_elasticsearch_vector_store.search = AsyncMock(return_value=mock_search_results)
     mock_request_context = make_request_context()
 
-    result = await document_manager.search_chunks(
+    result, usage = await document_manager.search_chunks(
         postgres_session=mock_session,
         elasticsearch_vector_store=mock_elasticsearch_vector_store,
         elasticsearch_client=mock_elasticsearch_client,
@@ -713,6 +715,7 @@ async def test_search_chunks_with_similarity():
     )
 
     assert len(result) == 2
+    assert usage == Usage(prompt_tokens=3, total_tokens=3)
     document_manager._create_embeddings.assert_awaited_once()
     mock_elasticsearch_vector_store.search.assert_awaited_once()
 
@@ -738,7 +741,7 @@ async def test_search_chunks_with_lexical():
     mock_elasticsearch_vector_store.search = AsyncMock(return_value=mock_search_results)
     mock_request_context = make_request_context()
 
-    result = await document_manager.search_chunks(
+    result, usage = await document_manager.search_chunks(
         postgres_session=mock_session,
         elasticsearch_vector_store=mock_elasticsearch_vector_store,
         elasticsearch_client=mock_elasticsearch_client,
@@ -755,6 +758,7 @@ async def test_search_chunks_with_lexical():
     )
 
     assert len(result) == 2
+    assert usage == Usage()
     document_manager._create_embeddings.assert_not_awaited()
     call_kwargs = mock_elasticsearch_vector_store.search.call_args.kwargs
     assert call_kwargs["query_vector"] is None

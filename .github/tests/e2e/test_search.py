@@ -112,6 +112,8 @@ class TestSearch:
         searches = Searches(**response.json())
         assert len(searches.data) == 1
         assert searches.data[0].chunk.content == "Qui est Voltaire ?"
+        assert searches.usage.prompt_tokens > 0
+        assert searches.usage.total_tokens > 0
 
     def test_search_with_score_threshold(self, user_client: TestClient, admin_client: TestClient):
         """Test POST /search with a score threshold."""
@@ -254,6 +256,7 @@ class TestSearch:
         assert len(searches.data) >= 1
         assert all(search.chunk.document_id == second_document_id for search in searches.data)
         assert document_id not in [search.chunk.document_id for search in searches.data]
+        assert searches.usage.total_tokens == 0
 
     def test_search_with_metadata_compound_filter_or(self, user_client: TestClient, admin_client: TestClient, collection_id: int, es_refresh):
         second_document_id = self._create_document_with_chunk(

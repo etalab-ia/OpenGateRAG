@@ -17,6 +17,7 @@ from opengaterag.api.schemas.chunks import Chunk, ChunkMetadata, InputChunk
 from opengaterag.api.schemas.collections import Collection, CollectionVisibility
 from opengaterag.api.schemas.documents import Document, PresetSeparators
 from opengaterag.api.schemas.search import ComparisonFilter, CompoundFilter, Search, SearchMethod
+from opengaterag.api.schemas.usage import Usage
 from opengaterag.api.utils.configuration import configuration
 from opengaterag.api.utils.context import RequestContext, global_context
 from opengaterag.api.utils.elasticsearch import ElasticsearchChunk
@@ -531,7 +532,7 @@ class DocumentManager:
 
         return chunks
 
-    async def _create_embeddings(self, model_api_key: str, input_texts: list[str]) -> list[float]:
+    async def _create_embeddings(self, model_api_key: str, input_texts: list[str]) -> tuple[list[list[float]], Usage]:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url=f"{self.model_api_url}/v1/embeddings",
@@ -549,7 +550,7 @@ class DocumentManager:
                 raise HTTPException(status_code=response.status_code, detail=detail)
 
             data = response.json()
-            return [vector["embedding"] for vector in data["data"]]
+            return ([vector["embedding"] for vector in data["data"]], Usage(**data["usage"]))
 
     async def search_chunks(
         self,
@@ -566,7 +567,7 @@ class DocumentManager:
         elasticsearch_vector_store: ElasticsearchVectorStore,
         elasticsearch_client: AsyncElasticsearch,
         request_context: ContextVar[RequestContext],
-    ) -> list[Search]:
+    ) -> tuple[list[Search], Usage]:
         # get collections ids
         result = await postgres_session.execute(
             statement=select(CollectionTable.id).where(
@@ -585,10 +586,11 @@ class DocumentManager:
             collection_ids = user_collections_ids
 
         if method == SearchMethod.LEXICAL:
+            usage = Usage()
             query_vector = None
         else:
-            response = await self._create_embeddings(model_api_key=request_context.get().api_key, input_texts=[query])
-            query_vector = response[0]
+            embeddings, usage = await self._create_embeddings(model_api_key=request_context.get().api_key, input_texts=[query])
+            query_vector = embeddings[0]
 
         searches = await elasticsearch_vector_store.search(
             client=elasticsearch_client,
@@ -604,7 +606,7 @@ class DocumentManager:
             score_threshold=score_threshold,
         )
 
-        return searches
+        return (searches, usage)
 
     async def _upsert_document_chunks(
         self,
@@ -617,7 +619,7 @@ class DocumentManager:
         for batch in batches:
             input_texts = [chunk.content for chunk in batch]
             batch_chunks = []
-            embeddings = await self._create_embeddings(model_api_key=request_context.get().api_key, input_texts=input_texts)
+            embeddings, _ = await self._create_embeddings(model_api_key=request_context.get().api_key, input_texts=input_texts)
             for chunk, embedding in zip(batch, embeddings):
                 batch_chunks.append(
                     ElasticsearchChunk(
