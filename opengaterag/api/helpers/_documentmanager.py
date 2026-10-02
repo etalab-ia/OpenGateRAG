@@ -30,6 +30,7 @@ from opengaterag.api.utils.exceptions import (
     InsufficientPermissionException,
     InsufficientStorageLimitException,
     ParsingDocumentFailedException,
+    UnsupportedFileTypeException,
     VectorizationFailedException,
 )
 from opengaterag.api.utils.sql import Collection as CollectionTable
@@ -233,6 +234,8 @@ class DocumentManager:
             try:
                 content = await self.parser_manager.parse(file=file)
                 document_token_count = len(global_context.tokenizer.encode(content))
+            except UnsupportedFileTypeException:
+                raise
             except Exception as e:
                 logger.exception(f"failed to parse {document_name} ({e}).")
                 raise ParsingDocumentFailedException()
