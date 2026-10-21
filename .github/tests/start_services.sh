@@ -45,7 +45,7 @@ admin_api_key="$(
     -H "Authorization: Bearer ${login_token}" \
     -H "Content-Type: application/json" \
     -d '{"name":"e2e-admin-key"}' \
-    | jq -r '.key // .token'
+    | jq -r '.value'
 )"
 
 router_id="$(
@@ -78,11 +78,11 @@ user_id="$(
 )"
 
 user_api_key="$(
-  curl -sf -X POST "http://localhost:8000/v1/admin/tokens" \
+  curl -sf -X POST "http://localhost:8000/v1/admin/keys" \
     -H "Authorization: Bearer ${admin_api_key}" \
     -H "Content-Type: application/json" \
     -d "{\"name\":\"e2e-user-key\",\"user\":${user_id}}" \
-    | jq -r '.key // .token'
+    | jq -r '.value'
 )"
 
 {
