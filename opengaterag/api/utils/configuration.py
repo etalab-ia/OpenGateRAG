@@ -179,7 +179,7 @@ class Settings(ConfigBaseModel):
     document_parsing_max_concurrent: int = Field(default=10, ge=1, description="Maximum number of concurrent document parsing tasks per worker.")  # fmt: off
 
     # storage
-    storage_default_limit: int | None = Field(default=None, ge=0, description="Default storage limit in tokens assigned to newly created users. If null, new users have no storage limit.")  # fmt: off
+    storage_default_limit: int | None = Field(default=10_000_000, ge=0, description="Default storage limit in tokens assigned to newly created users. If null, new users have no storage limit.")  # fmt: off
     storage_compute_tokenizer: Tokenizer = Field(default=Tokenizer.TIKTOKEN_GPT2, description="Tokenizer used to compute storage usage of the API.")
 
     # general
