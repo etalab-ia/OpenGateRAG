@@ -69,11 +69,19 @@ role_id="$(
     | jq -r '.id'
 )"
 
+organization_id="$(
+  curl -sf -X POST "http://localhost:8000/v1/admin/organizations" \
+    -H "Authorization: Bearer ${admin_api_key}" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"e2e-organization"}' \
+    | jq -r '.id'
+)"
+
 user_id="$(
   curl -sf -X POST "http://localhost:8000/v1/admin/users" \
     -H "Authorization: Bearer ${admin_api_key}" \
     -H "Content-Type: application/json" \
-    -d "{\"email\":\"user\",\"name\":\"user\",\"password\":\"changeme\",\"role\":${role_id}}" \
+    -d "{\"email\":\"user\",\"name\":\"user\",\"password\":\"changeme\",\"role_id\":${role_id},\"organization_id\":${organization_id}}" \
     | jq -r '.id'
 )"
 
