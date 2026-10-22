@@ -39,7 +39,7 @@ services:
       start_period: 60s
 
   api:
-    image: ghcr.io/etalab-ia/opengatellm/api:latest
+    image: ghcr.io/etalab-ia/opengatellm/api:${OPENGATELLM_VERSION:?}
     restart: always
     ports:
       - "8000:8000"
