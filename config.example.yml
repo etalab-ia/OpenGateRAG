@@ -28,7 +28,7 @@ dependencies:
 
 # ---------------------------------- settings -----------------------------------
 settings:
-  # storage_default_limit:  # unlimited by default
+  # storage_default_limit: 10000000  # 10M tokens by default, set to null for unlimited
   # storage_compute_tokenizer: tiktoken_gpt2  # default tokenizer
   # disabled_routers: ["collections"]
   # hidden_routers: ["documents"]
