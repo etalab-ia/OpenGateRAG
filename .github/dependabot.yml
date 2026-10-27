@@ -1,9 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: "github-actions"
-    directories:
-      - "/"
-      - "/.github/actions/*"
+    directory: "/"
     schedule:
       interval: "weekly"
     cooldown:
@@ -28,14 +26,3 @@ updates:
         applies-to: version-updates
         update-types: ["minor", "patch"]
 
-  - package-ecosystem: "npm"
-    directory: "/docs"
-    schedule:
-      interval: "weekly"
-    cooldown:
-      default-days: 14
-    open-pull-requests-limit: 0
-    groups:
-      docs-security:
-        applies-to: security-updates
-        patterns: ["*"]
