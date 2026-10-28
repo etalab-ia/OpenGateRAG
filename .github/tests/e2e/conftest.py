@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 # Must be set before importing the app, which interpolates the config file.
 os.environ.setdefault("POSTGRES_DB", "opengaterag")
 
+from opengaterag.api.infrastructure.configuration import get_configuration  # noqa: E402
+from opengaterag.api.infrastructure.postgres.models import User as UserTable  # noqa: E402
 from opengaterag.api.main import app  # noqa: E402
-from opengaterag.api.utils.configuration import configuration  # noqa: E402
-from opengaterag.api.utils.sql import User as UserTable  # noqa: E402
 
 
 class AuthenticatedTestClient:
@@ -53,7 +53,7 @@ def _validate_opengatellm_api_key(env_var: str, role: str) -> tuple[str, int]:
         raise ValueError(f"{env_var} is not set to run e2e tests.")
     with httpx.Client() as httpx_client:
         response = httpx_client.get(
-            url=f"{configuration.dependencies.opengatellm.url}/v1/me",
+            url=f"{get_configuration().dependencies.opengatellm.url}/v1/me",
             headers={"Authorization": f"Bearer {api_key}"},
         )
         try:
@@ -64,7 +64,7 @@ def _validate_opengatellm_api_key(env_var: str, role: str) -> tuple[str, int]:
 
 
 def _upsert_ogr_user(*, user_id: int, create_public_collection: bool) -> None:
-    url = configuration.dependencies.postgres.url.replace("+asyncpg", "")
+    url = get_configuration().dependencies.postgres.url.replace("+asyncpg", "")
     engine = create_engine(url)
     try:
         with Session(engine) as session:
@@ -73,7 +73,7 @@ def _upsert_ogr_user(*, user_id: int, create_public_collection: bool) -> None:
                 .values(
                     id=user_id,
                     create_public_collection=create_public_collection,
-                    storage_limit=configuration.settings.storage_default_limit,
+                    storage_limit=get_configuration().settings.storage_default_limit,
                 )
                 .on_conflict_do_update(
                     index_elements=[UserTable.id],

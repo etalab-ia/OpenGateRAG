@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 import httpx
 
-from opengaterag.api.utils.configuration import get_configuration
+from opengaterag.api.infrastructure.configuration import get_configuration
 
 
 @asynccontextmanager

@@ -2,7 +2,7 @@
 
 Coding conventions for this repository. OpenGateRAG stores **collections** and **documents** for OpenGateLLM users and searches them. Meilisearch indexes the documents and computes their embeddings.
 
-This file describes the **target** architecture of the revamp. `opengaterag/api/utils/` is legacy: move its modules into `infrastructure/` as slices need them, and never extend it. When this repo has no example of a pattern yet, ask the user for input.
+This file describes the **target** architecture of the revamp. When this repo has no example of a pattern yet, ask the user for input.
 
 Commit messages follow Conventional Commits (`feat:`, `fix(ci):`, `chore:`).
 

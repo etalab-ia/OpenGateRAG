@@ -10,7 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 from pydantic_settings import BaseSettings
 import yaml
 
-from opengaterag.api.utils.variables import DEFAULT_APP_NAME, RouterName
+from opengaterag.api.infrastructure.fastapi.routes import RouterName
+
+DEFAULT_APP_NAME = "OpenGateRAG"
 
 
 class ConfigBaseModel(BaseModel):
@@ -172,6 +174,3 @@ class Configuration(BaseSettings):
 @lru_cache
 def get_configuration() -> Configuration:
     return Configuration()
-
-
-configuration = get_configuration()

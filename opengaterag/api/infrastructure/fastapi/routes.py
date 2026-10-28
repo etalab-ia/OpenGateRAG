@@ -1,7 +1,5 @@
 from enum import StrEnum
 
-DEFAULT_APP_NAME = "OpenGateRAG"
-
 
 class RouterName(StrEnum):
     MONITORING = ("monitoring", None)
