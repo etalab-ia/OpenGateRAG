@@ -1,9 +1,14 @@
 import datetime as dt
+from enum import StrEnum
 
 from sqlalchemy import DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 
-from opengaterag.api.schemas.collections import CollectionVisibility
+
+class CollectionVisibility(StrEnum):
+    PRIVATE = "private"
+    PUBLIC = "public"
+
 
 Base = declarative_base()
 

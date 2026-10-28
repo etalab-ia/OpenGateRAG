@@ -1,9 +1,7 @@
-import asyncio
 from collections.abc import Generator, Mapping
 import os
 from typing import Any
 
-from elasticsearch import AsyncElasticsearch
 from fastapi.testclient import TestClient
 import httpx
 import pytest
@@ -17,25 +15,6 @@ os.environ.setdefault("POSTGRES_DB", "opengaterag")
 from opengaterag.api.main import app  # noqa: E402
 from opengaterag.api.utils.configuration import configuration  # noqa: E402
 from opengaterag.api.utils.sql import User as UserTable  # noqa: E402
-
-
-def refresh_elasticsearch_index() -> None:
-    """Force Elasticsearch to make recently indexed chunks visible to search."""
-
-    async def _refresh() -> None:
-        kwargs = configuration.dependencies.elasticsearch.model_dump()
-        index_name = kwargs.pop("index_name")
-        kwargs.pop("index_language")
-        kwargs.pop("number_of_shards")
-        kwargs.pop("number_of_replicas")
-        kwargs.pop("refresh_interval")
-        client = AsyncElasticsearch(**kwargs)
-        try:
-            await client.indices.refresh(index=index_name)
-        finally:
-            await client.close()
-
-    asyncio.run(_refresh())
 
 
 class AuthenticatedTestClient:
@@ -108,28 +87,7 @@ def _upsert_ogr_user(*, user_id: int, create_public_collection: bool) -> None:
 
 
 @pytest.fixture(scope="session")
-def setup_elasticsearch_index() -> None:
-    """Delete Elasticsearch index before running integration tests."""
-
-    async def _delete_index() -> None:
-        kwargs = configuration.dependencies.elasticsearch.model_dump()
-        index_name = kwargs.pop("index_name")
-        kwargs.pop("index_language")
-        kwargs.pop("number_of_shards")
-        kwargs.pop("number_of_replicas")
-        kwargs.pop("refresh_interval")
-        client = AsyncElasticsearch(**kwargs)
-        try:
-            if await client.indices.exists(index=index_name):
-                await client.indices.delete(index=index_name)
-        finally:
-            await client.close()
-
-    asyncio.run(_delete_index())
-
-
-@pytest.fixture(scope="session")
-def test_client(setup_elasticsearch_index) -> Generator[TestClient, None, None]:
+def test_client() -> Generator[TestClient, None, None]:
     """Single TestClient for the session to keep one event loop and one app lifespan."""
     with TestClient(app=app) as client:
         yield client
@@ -148,15 +106,3 @@ def admin_client(test_client: TestClient) -> AuthenticatedTestClient:
     api_key, user_id = _validate_opengatellm_api_key("OPENGATELLM_ADMIN_API_KEY", "admin")
     _upsert_ogr_user(user_id=user_id, create_public_collection=True)
     return AuthenticatedTestClient(client=test_client, api_key=api_key)
-
-
-@pytest.fixture(scope="function")
-def es_refresh():
-    """
-    Callable fixture: call `es_refresh()` after writes so searches see fresh data.
-
-    We return the callable (instead of auto-refresh) so tests can refresh exactly
-    after indexing (documents/chunks) and avoid timing-based sleeps.
-    """
-
-    return refresh_elasticsearch_index

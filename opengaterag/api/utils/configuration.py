@@ -11,7 +11,6 @@ from pydantic import ValidationError as PydanticValidationError
 from pydantic_settings import BaseSettings
 import yaml
 
-from opengaterag.api.utils.elasticsearch import ElasticsearchIndexLanguage
 from opengaterag.api.utils.variables import DEFAULT_APP_NAME, RouterName
 
 # utils ----------------------------------------------------------------------------------------------------------------------------------------------
@@ -97,21 +96,6 @@ class ConfigBaseModel(BaseModel):
 
 
 @custom_validation_error()
-class ElasticsearchDependency(ConfigBaseModel):
-    """
-    Elasticsearch is a required dependency of OpenGateRAG. Elasticsearch is used as a vector store. If this dependency is provided, all documents endpoint are enabled.
-    Pass all arguments of `elasticsearch.Elasticsearch` class, see https://elasticsearch-py.readthedocs.io/en/latest/api/elasticsearch.html for more information.
-    Other arguments declared below are used to configure the Elasticsearch index.
-    """
-
-    index_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(default="opengaterag", description="Name of the Elasticsearch index.", examples=["my_index"])  # fmt: off
-    index_language: Annotated[ElasticsearchIndexLanguage, Field(default=ElasticsearchIndexLanguage.ENGLISH, description="Language of the Elasticsearch index.", examples=[ElasticsearchIndexLanguage.ENGLISH.value])]  # fmt: off
-    number_of_shards: Annotated[int, Field(default=12, ge=1, le=75, description="Number of shards for the Elasticsearch index.", examples=[4])]
-    number_of_replicas: Annotated[int, Field(default=1, ge=0, description="Number of replicas for the Elasticsearch index.", examples=[1])]
-    refresh_interval: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^(-1|\d+(ms|s|m|h|d))$")] = Field(default="1s", description="Refresh interval for the Elasticsearch index", examples=["2s"])  # fmt: off
-
-
-@custom_validation_error()
 class OpengateLLMDependency(ConfigBaseModel):
     """
     OpengateLLM is a required dependency of OpenGateLLM. It is used to connect to the OpengateLLM API.
@@ -153,7 +137,6 @@ class SentryDependency(ConfigBaseModel):
 
 @custom_validation_error()
 class Dependencies(ConfigBaseModel):
-    elasticsearch: ElasticsearchDependency = Field(default=..., description="Elasticsearch is a required dependency of OpenGateRAG. Elasticsearch is used as a vector store. If this dependency is provided, all documents endpoint are enabled.")  # fmt: off
     opengatellm: OpengateLLMDependency = Field(..., description="OpengateLLM is a required dependency of OpenGateRAG to embed the text in the vector store and retrieve user information.")  # fmt: off
     postgres: PostgresDependency = Field(..., description="Postgres is a required dependency of OpenGateRAG to store API data.")  # fmt: off
     sentry: SentryDependency | None = Field(default=None, description="Sentry is an optional dependency of OpenGateRAG. Sentry helps you identify, diagnose, and fix errors in real-time.")  # fmt: off
@@ -213,7 +196,7 @@ class ConfigFile(ConfigBaseModel):
     """
     Configuration file is composed of 3 sections, models:
     - `models`: to declare models API exposed to the API.
-    - `dependencies`: to declare both required plugins for the API (e.g. PostgreSQL, Redis) and optional ones (e.g. Elasticsearch).
+    - `dependencies`: to declare both required plugins for the API (e.g. PostgreSQL, Redis) and optional ones (e.g. Sentry).
     - `settings`: to configure the API.
 
     :::warnings

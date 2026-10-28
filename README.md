@@ -28,7 +28,7 @@
 * Lauch database dependencies
 
     ```bash
-    docker compose --file compose.example.yml up --wait --detach postgres elasticsearch
+    docker compose --file compose.example.yml up --wait --detach postgres
     ```
 
 * Instantiate database

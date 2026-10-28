@@ -18,7 +18,6 @@ dependencies = [
     "pydantic-settings==2.14.2",
     "sqlalchemy-utils==0.42.1",
     "sqlalchemy[asyncio]==2.0.47",
-    "elasticsearch[async]==9.3.0",
     "psycopg2-binary==2.9.11",
     "html-to-markdown==2.29.0",
     "pymupdf4llm==0.3.4",

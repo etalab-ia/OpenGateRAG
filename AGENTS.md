@@ -2,7 +2,7 @@
 
 Coding conventions for this repository. OpenGateRAG stores **collections** and **documents** for OpenGateLLM users and searches them. Meilisearch indexes the documents and computes their embeddings.
 
-This file describes the **target** architecture of the revamp. `opengaterag/api/helpers/`, `utils/`, `endpoints/` and `schemas/` are legacy: replace them one slice at a time and never extend them. When this repo has no example of a pattern yet, ask the user for input.
+This file describes the **target** architecture of the revamp. `opengaterag/api/utils/` is legacy: move its modules into `infrastructure/` as slices need them, and never extend it. When this repo has no example of a pattern yet, ask the user for input.
 
 Commit messages follow Conventional Commits (`feat:`, `fix(ci):`, `chore:`). Do not edit `.github/badges/coverage.json`: CI rewrites it.
 
@@ -141,6 +141,8 @@ Verbs: `Create`, `Update`, `Delete`, `GetOne` (by id), `Get<Plural>` (list). Nev
 ---
 
 ## Tests
+
+> **TODO: CI runs no tests.** `.github/workflows/run_tests.yml` was removed with the legacy code. Once the first slice has tests, add a workflow back with unit, integration (Postgres, Meilisearch) and e2e jobs.
 
 | Layer | Path | Covers |
 |---|---|---|
