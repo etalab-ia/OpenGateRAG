@@ -5,6 +5,8 @@ on:
     branches: [ main ]
     paths:
       - "opengaterag/api/**"
+      - "pyproject.toml"
+      - ".github/workflows/**"
   workflow_call: # Add this to make the workflow reusable
   workflow_dispatch: # Add this to allow manual triggering
 
