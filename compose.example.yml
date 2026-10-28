@@ -2,7 +2,7 @@ name: opengaterag
 
 services:
   rag:
-    image: ghcr.io/etalab-ia/opengaterag:latest
+    image: ghcr.io/etalab-ia/opengaterag-next:latest
     restart: always
     env_file: .env
     environment:

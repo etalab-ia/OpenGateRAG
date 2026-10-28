@@ -4,7 +4,7 @@ Coding conventions for this repository. OpenGateRAG stores **collections** and *
 
 This file describes the **target** architecture of the revamp. `opengaterag/api/utils/` is legacy: move its modules into `infrastructure/` as slices need them, and never extend it. When this repo has no example of a pattern yet, ask the user for input.
 
-Commit messages follow Conventional Commits (`feat:`, `fix(ci):`, `chore:`). Do not edit `.github/badges/coverage.json`: CI rewrites it.
+Commit messages follow Conventional Commits (`feat:`, `fix(ci):`, `chore:`).
 
 ---
 
@@ -142,7 +142,7 @@ Verbs: `Create`, `Update`, `Delete`, `GetOne` (by id), `Get<Plural>` (list). Nev
 
 ## Tests
 
-> **TODO: CI runs no tests.** `.github/workflows/run_tests.yml` was removed with the legacy code. Once the first slice has tests, add a workflow back with unit, integration (Postgres, Meilisearch) and e2e jobs.
+> **TODO: CI runs no tests.** `.github/workflows/run_tests.yml` was removed with the legacy code. Once the first slice has tests, add a workflow back with unit, integration (Postgres, Meilisearch) and e2e jobs, plus the coverage badge (`.github/badges/coverage.json` and its README badge). CI writes that file: never edit it by hand.
 
 | Layer | Path | Covers |
 |---|---|---|

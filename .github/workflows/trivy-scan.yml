@@ -33,7 +33,6 @@ jobs:
           format: 'table'
           severity: 'HIGH'
           exit-code: "0"
-          trivyignores: .github/.trivyignore
 
       # CRITICAL → stop the pipeline
       - name: Trivy scan (CRITICAL — blocking)
@@ -43,4 +42,3 @@ jobs:
           format: 'table'
           severity: 'CRITICAL'
           exit-code: "1"
-          trivyignores: .github/.trivyignore
