@@ -1,3 +1,4 @@
+import logging
 import time
 
 from fastapi import FastAPI
@@ -6,10 +7,9 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import httpx
 
 from opengaterag.api.infrastructure.configuration import Configuration
-from opengaterag.api.infrastructure.logging import init_logger
 from opengaterag.docs.openapi import fetch_openapi_schema, merge_openapi_schemas
 
-logger = init_logger(name=__name__)
+logger = logging.getLogger(__name__)
 
 OPENAPI_CACHE_TTL_SECONDS = 300
 

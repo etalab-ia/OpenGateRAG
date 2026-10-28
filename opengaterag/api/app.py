@@ -12,6 +12,7 @@ from starlette.responses import Response
 
 from opengaterag.api.infrastructure.configuration import Configuration, get_configuration
 from opengaterag.api.infrastructure.fastapi.routes import RouterName
+from opengaterag.api.infrastructure.logging import configure_logging
 from opengaterag.api.lifespan import lifespan
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ def create_app(
     if configuration is None:
         configuration = get_configuration()
 
+    configure_logging(configuration.settings)
     _setup_sentry(configuration)
 
     app = FastAPI(

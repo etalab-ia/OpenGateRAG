@@ -1,14 +1,9 @@
 import datetime as dt
-from enum import StrEnum
 
 from sqlalchemy import DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 
-
-class CollectionVisibility(StrEnum):
-    PRIVATE = "private"
-    PUBLIC = "public"
-
+from opengaterag.api.domain.collection.entities import CollectionVisibility
 
 Base = declarative_base()
 
@@ -24,21 +19,18 @@ class User(Base):
     created: Mapped[dt.datetime] = mapped_column(UtcDateTime, insert_default=func.now())
     updated: Mapped[dt.datetime] = mapped_column(UtcDateTime, insert_default=func.now(), onupdate=func.now())
 
-    collection: Mapped[list["Collection"]] = relationship(back_populates="user", passive_deletes=True)
-
 
 class Collection(Base):
     __tablename__ = "collection"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey(column="user.id", ondelete="CASCADE"))
+    user_id: Mapped[int]
     name: Mapped[str]
     description: Mapped[str | None]
     visibility: Mapped[CollectionVisibility]
     created: Mapped[dt.datetime] = mapped_column(UtcDateTime, insert_default=func.now())
     updated: Mapped[dt.datetime] = mapped_column(UtcDateTime, insert_default=func.now(), onupdate=func.now())
 
-    user: Mapped["User"] = relationship(back_populates="collection")
     document: Mapped[list["Document"]] = relationship(back_populates="collection", cascade="all, delete-orphan", passive_deletes=True)
 
 

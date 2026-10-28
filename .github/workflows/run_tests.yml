@@ -1,0 +1,73 @@
+name: Testing
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "opengaterag/api/**"
+      - ".github/workflows/run_tests.yml"
+  workflow_call: # Add this to make the workflow reusable
+  workflow_dispatch: # Add this to allow manual triggering
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+
+      - name: Run unit tests with coverage and publish unit badge
+        run: |
+          # Create a local virtual environment and install dependencies
+          uv venv
+          uv pip install -p .venv/bin/python ".[test]"
+
+          # Activate venv for the test run
+          . .venv/bin/activate
+
+          # Run unit tests with coverage
+          pytest opengaterag/api/tests/unit --cov=opengaterag --cov-report=xml:coverage.xml
+
+          # Build unit coverage badge JSON
+          mkdir -p .github/badges
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; print(ET.parse('coverage.xml').getroot().get('line-rate'))")
+          COVERAGE_PCT=$(printf "%.2f" $(echo "${COVERAGE} * 100" | bc))
+          echo "{\"schemaVersion\":1,\"label\":\"coverage\",\"message\":\"${COVERAGE_PCT}%\",\"color\":\"$(if (( $(echo \"${COVERAGE_PCT} >= 80\" | bc -l) )); then echo "green"; elif (( $(echo \"${COVERAGE_PCT} >= 70\" | bc -l) )); then echo "yellow"; else echo "red"; fi)\"}" > .github/badges/coverage.json
+
+      - name: Commit unit coverage badge
+        if: github.event.pull_request.base.ref == 'main'
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Update unit coverage badge
+          file_pattern: .github/badges/coverage.json
+          commit_user_name: "GitHub Actions"
+          commit_user_email: "actions@github.com"
+
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+
+      - name: Start Postgres
+        run: |
+          # compose.example.yml declares `env_file: .env` for the rag service, which compose requires to exist
+          touch .env
+          docker compose --file compose.example.yml up --wait --detach postgres
+
+      - name: Run integration tests
+        run: |
+          uv venv
+          uv pip install -p .venv/bin/python ".[test]"
+          . .venv/bin/activate
+          pytest opengaterag/api/tests/integration
+        env:
+          TEST_POSTGRES_URL: postgresql+asyncpg://postgres:changeme@localhost:5432/opengaterag_test

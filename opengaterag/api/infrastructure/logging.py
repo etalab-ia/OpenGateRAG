@@ -1,8 +1,8 @@
 from contextvars import ContextVar
-from logging import Filter, Formatter, Logger, StreamHandler, getLogger
+from logging import Filter, Formatter, StreamHandler, getLogger
 import sys
 
-from opengaterag.api.infrastructure.configuration import get_configuration
+from opengaterag.api.infrastructure.configuration import Settings
 
 client_ip: ContextVar[str | None] = ContextVar("client_ip", default=None)
 
@@ -32,16 +32,13 @@ class ColoredFormatter(Formatter):
         return super().format(record)
 
 
-def init_logger(name) -> Logger:
-    configuration = get_configuration()
-    logger = getLogger(name=name)
-    logger.setLevel(level=configuration.settings.log_level)
+def configure_logging(settings: Settings) -> None:
+    logger = getLogger(name="opengaterag")
+    logger.setLevel(level=settings.log_level)
     handler = StreamHandler(stream=sys.stdout)
-    formatter = ColoredFormatter(configuration.settings.log_format)
-    handler.setFormatter(formatter)
+    handler.setFormatter(ColoredFormatter(settings.log_format))
     handler.addFilter(ClientIPFilter())
 
+    logger.handlers.clear()
     logger.addHandler(handler)
     logger.propagate = False  # Prevent propagation to root logger
-
-    return logger

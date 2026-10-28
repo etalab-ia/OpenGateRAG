@@ -35,7 +35,7 @@ opengaterag/docs/      unified Swagger/ReDoc merging the OpenGateLLM schema (unc
 
 | Context | Entities / views | Ports → adapters |
 |---|---|---|
-| `collection` | `Collection`, `CollectionVisibility`, `CollectionView` (+ document count, size) | `CollectionRepository` → `PostgresCollectionRepository`, `CollectionQuery` → `PostgresCollectionQuery` |
+| `collection` | `Collection`, `CollectionVisibility`, `CollectionView` (+ document count) | `CollectionRepository` → `PostgresCollectionRepository`, `CollectionQuery` → `PostgresCollectionQuery` |
 | `document` | `Document`, `Chunk` (internal value object, never exposed as a resource) | `DocumentRepository` → `PostgresDocumentRepository`, `DocumentParser`, `TextSplitter`, `Tokenizer` → `infrastructure/text/` |
 | `search` | `SearchMethod`, `MetadataFilter`, `SearchResult` | `ChunkIndex` → `MeilisearchChunkIndex` |
 | `user` | `User` (storage limit, public-collection right), `AuthenticatedUserView` | `UserRepository` → `PostgresUserRepository`, `AuthenticatedUserQuery` → `OpenGateLLMAuthenticatedUserQuery` |
@@ -130,6 +130,7 @@ Verbs: `Create`, `Update`, `Delete`, `GetOne` (by id), `Get<Plural>` (list). Nev
 - **Entities** are Pydantic `BaseModel`. **Errors, commands and successes** are `@dataclass`.
 - **Use cases:** one file per operation. Domain errors are **returned, never raised**. The whole flow sits in `execute()` and branches with `match`/`case`. A step may be extracted into a method that returns `Value | Error`, as long as `execute()` does the `match`. From `execute()` alone, a reader must see every path a request can take. Helpers are `@staticmethod`s on the class, not module functions.
 - **Repositories** return `Entity | DomainError`. They map only known `IntegrityError` constraint names and re-raise any other. Never `text(f"...")` an `ORDER BY`: map the sort enum to a column.
+- **Auth:** `AccessController` is a `Security` dependency that returns the `AuthenticatedUserView`. Endpoints take it as a parameter and pass `user.id` into the command. There is no request-scoped global.
 - **Endpoints** are thin: build the command, call `execute()`, `match` the result, and map each error to its HTTP exception in `infrastructure/fastapi/endpoints/exceptions.py`. Never wrap a use case in `try/except Exception`.
 - **Routes:** `RouterName` (switchable routers + `module_path`) and `EndpointRoute` (mount paths) are separate enums. Never build an `EndpointRoute` from a `RouterName`. A module without a `RouterName` member is never imported.
 - **Responses** carry `object` (`"collection"`, `"document"`, `"search_result"`, `"list"`). Paginated lists are `{object: "list", total, offset, limit, data}`. Build them with `Response.model_validate(entity, from_attributes=True)`, never a hand-written mapper. Foreign keys are `*_id` (`user_id`, not `owner`). Timestamps are Unix `int` in the API and timezone-aware UTC `datetime` everywhere else.
@@ -138,11 +139,30 @@ Verbs: `Create`, `Update`, `Delete`, `GetOne` (by id), `Get<Plural>` (list). Nev
 - **HTTP clients** (Meilisearch, OpenGateLLM) are shared `httpx.AsyncClient`s created in the lifespan, not one client per request. The official `meilisearch` Python client is synchronous and would block the event loop.
 - **Imports:** relative single-dot imports only for siblings and `__init__.py` re-exports, absolute imports everywhere else. A module never imports from its own package root.
 
+## Reference implementations
+
+The first slice of each pattern. Copy it when adding the same kind of code. Paths are relative to `opengaterag/api/` unless they start with `.github/`.
+
+| Pattern | Reference |
+|---|---|
+| Domain context (entities, view, errors, ports) | `domain/collection/` |
+| Use case | `use_cases/collections/_createcollectionusecase.py` |
+| Postgres repository | `infrastructure/postgres/_postgrescollectionrepository.py` |
+| HTTP adapter on a shared client | `infrastructure/opengatellm/_opengatellmauthenticateduserquery.py` |
+| Endpoint, error mapping, auth | `infrastructure/fastapi/endpoints/collections.py`, `accesscontroller.py` |
+| DI factory | `create_collection_use_case_factory` in `dependencies.py` |
+| Unit use case test | `tests/unit/use_case/collections/test_createcollectionusecase.py` |
+| Integration endpoint / Postgres tests | `tests/integration/endpoints/test_create_collection.py`, `tests/integration/postgres/` |
+
 ---
 
 ## Tests
 
-> **TODO: CI runs no tests.** `.github/workflows/run_tests.yml` was removed with the legacy code. Once the first slice has tests, add a workflow back with unit, integration (Postgres, Meilisearch) and e2e jobs, plus the coverage badge (`.github/badges/coverage.json` and its README badge). CI writes that file: never edit it by hand.
+`.github/workflows/run_tests.yml` runs two jobs on pull requests: unit (which also writes the coverage badge `.github/badges/coverage.json`: CI writes that file, never edit it by hand) and integration (Postgres from `compose.example.yml`; add Meilisearch with its first slice).
+
+> **TODO: no e2e job yet.** The e2e OpenGateLLM (`.github/tests/config.opengatellm.yml`) embeds through the Albert API and needs an `ALBERT_ADMIN_API_KEY` Actions secret. Add the job back once that secret is set.
+
+Integration tests create the `TEST_POSTGRES_URL` database (default `postgresql+asyncpg://postgres:changeme@localhost:5432/opengaterag_test`) from the models, and roll back every test.
 
 | Layer | Path | Covers |
 |---|---|---|
@@ -175,3 +195,7 @@ ruff check --fix . && ruff format .
 4. Fail explicitly: return known domain errors and re-raise unknown failures.
 5. Keep `config.example.yml`, `.env.example`, both compose files and the README in sync with the configuration in the same change.
 6. `AGENTS.md` is the source of truth for conventions. When a pattern lands or changes, update this file in the same change, and record the first slice of each pattern as its reference implementation.
+
+## Deferred to the end of the revamp
+
+- **Quota management and viewing usage.** Rethink the storage quota as a whole: what a document's size means and how it is counted, how `storage_limit` is enforced, and how a user sees their usage against their limit (one per-user "used / limit" figure, not a size on each collection). Collection responses deliberately carry no `size` until then.
