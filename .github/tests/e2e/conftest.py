@@ -1,9 +1,7 @@
-import asyncio
 from collections.abc import Generator, Mapping
 import os
 from typing import Any
 
-from elasticsearch import AsyncElasticsearch
 from fastapi.testclient import TestClient
 import httpx
 import pytest
@@ -14,28 +12,9 @@ from sqlalchemy.orm import Session
 # Must be set before importing the app, which interpolates the config file.
 os.environ.setdefault("POSTGRES_DB", "opengaterag")
 
+from opengaterag.api.infrastructure.configuration import get_configuration  # noqa: E402
+from opengaterag.api.infrastructure.postgres.models import User as UserTable  # noqa: E402
 from opengaterag.api.main import app  # noqa: E402
-from opengaterag.api.utils.configuration import configuration  # noqa: E402
-from opengaterag.api.utils.sql import User as UserTable  # noqa: E402
-
-
-def refresh_elasticsearch_index() -> None:
-    """Force Elasticsearch to make recently indexed chunks visible to search."""
-
-    async def _refresh() -> None:
-        kwargs = configuration.dependencies.elasticsearch.model_dump()
-        index_name = kwargs.pop("index_name")
-        kwargs.pop("index_language")
-        kwargs.pop("number_of_shards")
-        kwargs.pop("number_of_replicas")
-        kwargs.pop("refresh_interval")
-        client = AsyncElasticsearch(**kwargs)
-        try:
-            await client.indices.refresh(index=index_name)
-        finally:
-            await client.close()
-
-    asyncio.run(_refresh())
 
 
 class AuthenticatedTestClient:
@@ -74,7 +53,7 @@ def _validate_opengatellm_api_key(env_var: str, role: str) -> tuple[str, int]:
         raise ValueError(f"{env_var} is not set to run e2e tests.")
     with httpx.Client() as httpx_client:
         response = httpx_client.get(
-            url=f"{configuration.dependencies.opengatellm.url}/v1/me",
+            url=f"{get_configuration().dependencies.opengatellm.url}/v1/me",
             headers={"Authorization": f"Bearer {api_key}"},
         )
         try:
@@ -85,7 +64,7 @@ def _validate_opengatellm_api_key(env_var: str, role: str) -> tuple[str, int]:
 
 
 def _upsert_ogr_user(*, user_id: int, create_public_collection: bool) -> None:
-    url = configuration.dependencies.postgres.url.replace("+asyncpg", "")
+    url = get_configuration().dependencies.postgres.url.replace("+asyncpg", "")
     engine = create_engine(url)
     try:
         with Session(engine) as session:
@@ -94,7 +73,7 @@ def _upsert_ogr_user(*, user_id: int, create_public_collection: bool) -> None:
                 .values(
                     id=user_id,
                     create_public_collection=create_public_collection,
-                    storage_limit=configuration.settings.storage_default_limit,
+                    storage_limit=get_configuration().settings.storage_default_limit,
                 )
                 .on_conflict_do_update(
                     index_elements=[UserTable.id],
@@ -108,28 +87,7 @@ def _upsert_ogr_user(*, user_id: int, create_public_collection: bool) -> None:
 
 
 @pytest.fixture(scope="session")
-def setup_elasticsearch_index() -> None:
-    """Delete Elasticsearch index before running integration tests."""
-
-    async def _delete_index() -> None:
-        kwargs = configuration.dependencies.elasticsearch.model_dump()
-        index_name = kwargs.pop("index_name")
-        kwargs.pop("index_language")
-        kwargs.pop("number_of_shards")
-        kwargs.pop("number_of_replicas")
-        kwargs.pop("refresh_interval")
-        client = AsyncElasticsearch(**kwargs)
-        try:
-            if await client.indices.exists(index=index_name):
-                await client.indices.delete(index=index_name)
-        finally:
-            await client.close()
-
-    asyncio.run(_delete_index())
-
-
-@pytest.fixture(scope="session")
-def test_client(setup_elasticsearch_index) -> Generator[TestClient, None, None]:
+def test_client() -> Generator[TestClient, None, None]:
     """Single TestClient for the session to keep one event loop and one app lifespan."""
     with TestClient(app=app) as client:
         yield client
@@ -148,15 +106,3 @@ def admin_client(test_client: TestClient) -> AuthenticatedTestClient:
     api_key, user_id = _validate_opengatellm_api_key("OPENGATELLM_ADMIN_API_KEY", "admin")
     _upsert_ogr_user(user_id=user_id, create_public_collection=True)
     return AuthenticatedTestClient(client=test_client, api_key=api_key)
-
-
-@pytest.fixture(scope="function")
-def es_refresh():
-    """
-    Callable fixture: call `es_refresh()` after writes so searches see fresh data.
-
-    We return the callable (instead of auto-refresh) so tests can refresh exactly
-    after indexing (documents/chunks) and avoid timing-based sleeps.
-    """
-
-    return refresh_elasticsearch_index

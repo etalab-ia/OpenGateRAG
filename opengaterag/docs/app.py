@@ -5,8 +5,8 @@ from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 import httpx
 
-from opengaterag.api.utils.configuration import Configuration
-from opengaterag.api.utils.logging import init_logger
+from opengaterag.api.infrastructure.configuration import Configuration
+from opengaterag.api.infrastructure.logging import init_logger
 from opengaterag.docs.openapi import fetch_openapi_schema, merge_openapi_schemas
 
 logger = init_logger(name=__name__)

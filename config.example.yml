@@ -15,17 +15,6 @@ dependencies:
         statement_timeout: "120s"
       command_timeout: 60
 
-  elasticsearch:
-    index_name: opengaterag
-    index_language: french
-    number_of_shards: 1
-    number_of_replicas: 0
-    refresh_interval: 1s
-    hosts: http://${ELASTICSEARCH_HOST:-localhost}:${ELASTICSEARCH_PORT:-9200}
-    basic_auth:
-      - ${ELASTICSEARCH_USERNAME:-elastic}
-      - ${ELASTICSEARCH_PASSWORD:-changeme}
-
 # ---------------------------------- settings -----------------------------------
 settings:
   # storage_default_limit: 10000000  # 10M tokens by default, set to null for unlimited

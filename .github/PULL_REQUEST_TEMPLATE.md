@@ -27,7 +27,7 @@
 - [ ] Updated or added integration tests
 - [ ] No debug logs or commented-out code left
 - [ ] No secrets or environment variables committed in clear text
-- [ ] Code is linted and formatted using the project pre-commit hooks
+- [ ] Code is linted and formatted with ruff (`ruff check --fix . && ruff format .`)
 
 ## Deployment checklist
 

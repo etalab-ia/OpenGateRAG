@@ -2,7 +2,7 @@ from contextvars import ContextVar
 from logging import Filter, Formatter, Logger, StreamHandler, getLogger
 import sys
 
-from opengaterag.api.utils.configuration import configuration
+from opengaterag.api.infrastructure.configuration import get_configuration
 
 client_ip: ContextVar[str | None] = ContextVar("client_ip", default=None)
 
@@ -33,6 +33,7 @@ class ColoredFormatter(Formatter):
 
 
 def init_logger(name) -> Logger:
+    configuration = get_configuration()
     logger = getLogger(name=name)
     logger.setLevel(level=configuration.settings.log_level)
     handler = StreamHandler(stream=sys.stdout)

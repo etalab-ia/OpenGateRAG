@@ -3,11 +3,11 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from opengaterag.api.utils.sql import Base
-from opengaterag.api.utils.configuration import configuration
+from opengaterag.api.infrastructure.postgres.models import Base
+from opengaterag.api.infrastructure.configuration import get_configuration
 
 config = context.config
-config.set_main_option(name="sqlalchemy.url", value=configuration.dependencies.postgres.url.replace("+asyncpg", "").replace("+aiosqlite", ""))
+config.set_main_option(name="sqlalchemy.url", value=get_configuration().dependencies.postgres.url.replace("+asyncpg", "").replace("+aiosqlite", ""))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

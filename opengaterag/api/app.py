@@ -10,9 +10,9 @@ from prometheus_fastapi_instrumentator import Instrumentator
 import sentry_sdk
 from starlette.responses import Response
 
-from opengaterag.api.utils.configuration import Configuration, get_configuration
-from opengaterag.api.utils.lifespan import lifespan
-from opengaterag.api.utils.variables import RouterName
+from opengaterag.api.infrastructure.configuration import Configuration, get_configuration
+from opengaterag.api.infrastructure.fastapi.routes import RouterName
+from opengaterag.api.lifespan import lifespan
 
 logger = logging.getLogger(__name__)
 
