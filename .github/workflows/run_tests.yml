@@ -16,11 +16,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.head_ref || github.ref_name }}
 
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
       - name: Set up Docker Compose
         run: |
@@ -46,7 +46,7 @@ jobs:
 
       - name: Commit unit coverage badge
         if: github.event.pull_request.base.ref == 'main'
-        uses: stefanzweifel/git-auto-commit-action@v4
+        uses: stefanzweifel/git-auto-commit-action@v6
         with:
           commit_message: Update unit coverage badge
           file_pattern: .github/badges/coverage.json
@@ -57,9 +57,9 @@ jobs:
     name: e2e tests
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
-    - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+    - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
     - name: Resolve latest OpenGateLLM (pre)release
       run: echo "OPENGATELLM_VERSION=$(gh api 'repos/etalab-ia/opengatellm/releases?per_page=1' --jq '.[0].tag_name')" | tee -a "${GITHUB_ENV}"

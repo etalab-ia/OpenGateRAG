@@ -21,7 +21,7 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run Semgrep (diff only)
         run: semgrep ci --config auto --verbose
 
@@ -32,7 +32,7 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run Semgrep (WARNING severity)
         run: |
           semgrep scan \
