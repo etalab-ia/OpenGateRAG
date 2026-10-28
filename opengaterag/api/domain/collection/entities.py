@@ -16,3 +16,6 @@ class Collection(BaseModel):
     visibility: CollectionVisibility
     created: UtcDatetime
     updated: UtcDatetime
+
+    def is_readable_by(self, user_id: int) -> bool:
+        return self.user_id == user_id or self.visibility == CollectionVisibility.PUBLIC
