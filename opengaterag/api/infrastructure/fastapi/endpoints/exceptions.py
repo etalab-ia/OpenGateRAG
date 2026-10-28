@@ -17,3 +17,12 @@ class PublicCollectionNotAllowedHTTPException(HTTPException):
 
     def __init__(self) -> None:
         super().__init__(status_code=self.status_code, detail=self.detail)
+
+
+# 404
+class CollectionNotFoundHTTPException(HTTPException):
+    status_code = 404
+    detail = "Collection not found."
+
+    def __init__(self) -> None:
+        super().__init__(status_code=self.status_code, detail=self.detail)
