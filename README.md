@@ -20,11 +20,6 @@
     export $(cat .env | grep -v ^# | xargs)
     ```
 
-    > [!NOTE]
-    > The database setup by `OPENGATELLM_DATABASE_URL` environment variable must be the same
-    > as the database used by the API specified in `OPENGATELLM_URL` environment variable.
-
-
 * Lauch database dependencies
 
     ```bash
@@ -40,7 +35,7 @@
 * Run API locally
 
     ```bash
-    uvicorn opengaterag.api.app:app --reload
+    uvicorn opengaterag.api.main:app --reload
     ```
 
 ### Run tests
