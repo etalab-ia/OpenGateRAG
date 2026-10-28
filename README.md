@@ -1,6 +1,7 @@
 # OpenGateRAG
 
 [![Version](https://img.shields.io/github/v/release/etalab-ia/OpenGateRAG?color=blue&label=version)](https://github.com/etalab-ia/OpenGateRAG/releases)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/etalab-ia/OpenGateRAG-Next/refs/heads/main/.github/badges/coverage.json)](https://github.com/etalab-ia/OpenGateRAG-Next)
 [![License](https://img.shields.io/github/license/etalab-ia/OpenGateRAG?color=green&label=license)](https://github.com/etalab-ia/OpenGateRAG/blob/main/LICENSE)
 [![Stars](https://img.shields.io/github/stars/etalab-ia/OpenGateRAG?color=yellow&label=stars)](https://github.com/etalab-ia/OpenGateRAG/stargazers)
 
@@ -45,10 +46,18 @@
     pip install ".[test]"
     ```
 
-* Run tests
+* Run unit tests
 
     ```bash
     pytest opengaterag/api/tests/unit/
+    ```
+
+* Run integration tests (they create and drop the `opengaterag_test` database)
+
+    ```bash
+    docker compose --file compose.example.yml up --wait --detach postgres
+    export TEST_POSTGRES_URL=postgresql+asyncpg://postgres:changeme@localhost:${POSTGRES_PORT:-5432}/opengaterag_test
+    pytest opengaterag/api/tests/integration/
     ```
 
 ### Alembic migrations
