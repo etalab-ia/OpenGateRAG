@@ -12,7 +12,7 @@ dependencies = [
     "httpx==0.28.1",
     "sentry-sdk[fastapi]==2.53.0",
     "prometheus-fastapi-instrumentator==7.1.0",
-    "langchain-text-splitters==1.1.1",
+    "langchain-text-splitters==1.1.2",
     "pyyaml==6.0.3",
     "pydantic==2.13.4",
     "pydantic-settings==2.14.2",
@@ -24,7 +24,7 @@ dependencies = [
     "pymupdf4llm==0.3.4",
     "PyMuPDF==1.27.1",
     "pycountry==26.2.16",
-    "python-multipart==0.0.27",
+    "python-multipart==0.0.31",
     "asyncpg==0.31.0",
     "tiktoken==0.12.0",
 ]
