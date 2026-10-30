@@ -20,6 +20,7 @@ from opengaterag.api.utils.exceptions import (
     DocumentNotFoundException,
     InsufficientPermissionException,
     ParsingDocumentFailedException,
+    UnsupportedFileTypeException,
     VectorizationFailedException,
 )
 
@@ -829,6 +830,42 @@ async def test_create_document_parsing_fails():
             collection_id=123,
             file=mock_file,
             metadata=mock_metadata,
+            chunk_size=1000,
+            chunk_overlap=100,
+            chunk_min_size=50,
+            name=None,
+            disable_chunking=False,
+            separators=[],
+            preset_separators="markdown",
+            is_separator_regex=False,
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_document_unsupported_file_type_is_not_masked():
+    """Test that UnsupportedFileTypeException (422) raised by the parser is not turned into ParsingDocumentFailedException (500)."""
+    mock_parser = AsyncMock()
+    mock_parser.parse = AsyncMock(side_effect=UnsupportedFileTypeException())
+    mock_session = AsyncMock(spec=AsyncSession)
+    mock_session.execute = AsyncMock()
+
+    collection_result = MagicMock()
+    collection_result.scalar_one.return_value = MagicMock()
+    mock_session.execute.return_value = collection_result
+
+    document_manager = make_document_manager(mock_parser)
+
+    mock_file = create_upload_file("Test content", "test.png", "image/png")
+
+    with pytest.raises(UnsupportedFileTypeException):
+        await document_manager.create_document(
+            postgres_session=mock_session,
+            request_context=make_request_context(),
+            elasticsearch_vector_store=AsyncMock(),
+            elasticsearch_client=AsyncMock(),
+            collection_id=123,
+            file=mock_file,
+            metadata={},
             chunk_size=1000,
             chunk_overlap=100,
             chunk_min_size=50,
