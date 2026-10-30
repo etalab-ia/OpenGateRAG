@@ -22,7 +22,7 @@ dependencies = [
     "psycopg2-binary==2.9.11",
     "html-to-markdown==2.29.0",
     "pymupdf4llm==0.3.4",
-    "PyMuPDF==1.27.1",
+    "PyMuPDF==1.28.2",
     "pycountry==26.2.16",
     "python-multipart==0.0.31",
     "asyncpg==0.31.0",
