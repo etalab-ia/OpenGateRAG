@@ -6,6 +6,7 @@
 !scripts/**
 !.github/
 !pyproject.toml
+!uv.lock
 !config.example.yml
 
 .git

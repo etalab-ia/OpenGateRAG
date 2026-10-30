@@ -16,12 +16,11 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY ./pyproject.toml /app/pyproject.toml
+COPY ./uv.lock /app/uv.lock
 COPY ./opengaterag /app/opengaterag
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv venv /.venv
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --python /.venv/bin/python .
+    uv sync --locked --no-dev --no-install-project
 
 # Runtime stage
 FROM python:3.12-slim AS runtime
@@ -41,11 +40,11 @@ USER opengaterag
 WORKDIR /app
 
 # Copy application from builder
-COPY --from=builder --chown=opengaterag:opengaterag /.venv /.venv
+COPY --from=builder --chown=opengaterag:opengaterag /app/.venv /app/.venv
 COPY --from=builder --chown=opengaterag:opengaterag /app/opengaterag /app/opengaterag
 COPY --chown=opengaterag:opengaterag ./scripts/ /scripts/
 
-ENV PATH="/.venv/bin:${PATH}"
+ENV PATH="/app/.venv/bin:${PATH}"
 ENV PROMETHEUS_MULTIPROC_DIR="/tmp/prometheus_multiproc"
 ENV CONFIG_FILE="/config.yml"
 

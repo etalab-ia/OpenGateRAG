@@ -28,9 +28,8 @@ jobs:
 
       - name: Run unit tests with coverage and publish unit badge
         run: |
-          # Create a local virtual environment and install dependencies
-          uv venv
-          uv pip install -p .venv/bin/python ".[test]"
+          # Install the locked dependency set
+          uv sync --locked --extra test
           
           # Activate venv for the test run
           . .venv/bin/activate
@@ -85,9 +84,8 @@ jobs:
 
     - name: Run e2e tests
       run: |
-        # Create a local virtual environment and install dependencies
-        uv venv
-        uv pip install -p .venv/bin/python ".[test]"
+        # Install the locked dependency set
+        uv sync --locked --extra test
 
         # Activate venv for the test run
         . .venv/bin/activate
