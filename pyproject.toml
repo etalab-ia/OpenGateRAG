@@ -20,7 +20,7 @@ dependencies = [
     "sqlalchemy[asyncio]==2.0.47",
     "elasticsearch[async]==9.3.0",
     "psycopg2-binary==2.9.11",
-    "html-to-markdown==2.29.0",
+    "html-to-markdown==3.18.1",
     "pymupdf4llm==0.3.4",
     "PyMuPDF==1.28.2",
     "pycountry==26.2.16",
