@@ -11,7 +11,7 @@ dependencies = [
     "gunicorn==25.1.0",
     "httpx==0.28.1",
     "sentry-sdk[fastapi]==2.53.0",
-    "prometheus-fastapi-instrumentator==7.1.0",
+    "prometheus-fastapi-instrumentator==8.1.0",
     "langchain-text-splitters==1.1.2",
     "pyyaml==6.0.3",
     "pydantic==2.13.4",
