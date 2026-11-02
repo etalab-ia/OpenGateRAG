@@ -29,3 +29,21 @@ class TestIsReadableBy:
 
         # Assert
         assert is_readable is expected
+
+
+class TestIsWritableBy:
+    @pytest.mark.parametrize(
+        "visibility,user_id,expected",
+        [
+            (CollectionVisibility.PRIVATE, OWNER_ID, True),
+            (CollectionVisibility.PUBLIC, OWNER_ID, True),
+            (CollectionVisibility.PUBLIC, OTHER_USER_ID, False),
+            (CollectionVisibility.PRIVATE, OTHER_USER_ID, False),
+        ],
+    )
+    def test_should_be_writable_by_owner_only(self, visibility, user_id, expected):
+        # Act
+        is_writable = _collection(visibility).is_writable_by(user_id=user_id)
+
+        # Assert
+        assert is_writable is expected

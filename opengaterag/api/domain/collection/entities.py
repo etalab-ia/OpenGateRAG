@@ -19,3 +19,6 @@ class Collection(BaseModel):
 
     def is_readable_by(self, user_id: int) -> bool:
         return self.user_id == user_id or self.visibility == CollectionVisibility.PUBLIC
+
+    def is_writable_by(self, user_id: int) -> bool:
+        return self.user_id == user_id
