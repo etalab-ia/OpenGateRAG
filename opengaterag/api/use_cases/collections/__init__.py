@@ -1,5 +1,6 @@
 from ._createcollectionusecase import CreateCollectionCommand, CreateCollectionUseCase, CreateCollectionUseCaseSuccess
 from ._getonecollectionusecase import GetOneCollectionCommand, GetOneCollectionUseCase, GetOneCollectionUseCaseSuccess
+from ._updatecollectionusecase import UpdateCollectionCommand, UpdateCollectionUseCase, UpdateCollectionUseCaseSuccess
 
 __all__ = [
     "CreateCollectionCommand",
@@ -8,4 +9,7 @@ __all__ = [
     "GetOneCollectionCommand",
     "GetOneCollectionUseCase",
     "GetOneCollectionUseCaseSuccess",
+    "UpdateCollectionCommand",
+    "UpdateCollectionUseCase",
+    "UpdateCollectionUseCaseSuccess",
 ]
