@@ -53,7 +53,7 @@ class TestGetOneCollection:
     @pytest.mark.parametrize(
         "use_case_result,expected_status,expected_detail",
         [
-            (CollectionNotFoundError(collection_id=7), 404, "Collection not found."),
+            (CollectionNotFoundError(), 404, "Collection not found."),
         ],
     )
     async def test_should_map_error_to_http_status(

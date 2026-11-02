@@ -39,4 +39,4 @@ class TestGetCollection:
         result = await query.get_collection(collection_id=999_999)
 
         # Assert
-        assert result == CollectionNotFoundError(collection_id=999_999)
+        assert result == CollectionNotFoundError()

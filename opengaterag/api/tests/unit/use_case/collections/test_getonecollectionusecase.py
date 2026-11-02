@@ -58,14 +58,14 @@ class TestGetOneCollectionUseCase:
         result = await use_case.execute(GetOneCollectionCommand(user_id=OTHER_USER_ID, collection_id=COLLECTION_ID))
 
         # Assert
-        assert result == CollectionNotFoundError(collection_id=COLLECTION_ID)
+        assert result == CollectionNotFoundError()
 
     async def test_should_return_collection_not_found_error_when_collection_does_not_exist(self, use_case, mock_collection_query):
         # Arrange
-        mock_collection_query.get_collection.return_value = CollectionNotFoundError(collection_id=COLLECTION_ID)
+        mock_collection_query.get_collection.return_value = CollectionNotFoundError()
 
         # Act
         result = await use_case.execute(GetOneCollectionCommand(user_id=OWNER_ID, collection_id=COLLECTION_ID))
 
         # Assert
-        assert result == CollectionNotFoundError(collection_id=COLLECTION_ID)
+        assert result == CollectionNotFoundError()

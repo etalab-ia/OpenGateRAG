@@ -30,6 +30,6 @@ class GetOneCollectionUseCase:
             case CollectionNotFoundError():
                 return result
             case CollectionView() as collection if not collection.is_readable_by(user_id=command.user_id):
-                return CollectionNotFoundError(collection_id=command.collection_id)
+                return CollectionNotFoundError()
             case CollectionView() as collection:
                 return GetOneCollectionUseCaseSuccess(collection=collection)
