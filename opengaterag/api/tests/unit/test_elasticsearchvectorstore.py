@@ -350,6 +350,34 @@ class TestHybridSearch:
         assert len(results) == 2
 
     @pytest.mark.asyncio
+    async def test_hybrid_search_distinct_chunks_with_same_id_sum_are_not_merged(self):
+        """Test that distinct chunks whose document_id + id is equal are not merged (regression test)."""
+        store = ElasticsearchVectorStore(index_name="test-index")
+        mock_client = AsyncMock()
+
+        # (chunk 5, document 1) and (chunk 4, document 2): same document_id + id (6) but different chunks
+        mock_client.search = AsyncMock(
+            side_effect=[
+                {"hits": {"hits": [_make_es_hit(5, 1, score=5.0)]}},
+                {"hits": {"hits": [_make_es_hit(4, 2, score=0.95)]}},
+            ]
+        )
+
+        results = await store._hybrid_search(
+            client=mock_client,
+            query_prompt="test query",
+            query_vector=[0.1, 0.2, 0.3],
+            filters=[{"terms": {"collection_id": [1]}}],
+            limit=10,
+            offset=0,
+            rff_k=60,
+        )
+
+        assert {(result.chunk.document_id, result.chunk.id) for result in results} == {(1, 5), (2, 4)}
+        # each chunk appears in a single list, at rank 0
+        assert all(abs(result.score - 1 / (60 + 0 + 1)) < 1e-10 for result in results)
+
+    @pytest.mark.asyncio
     async def test_hybrid_search_deduplicates_same_chunk(self):
         """Test that the same chunk appearing in both searches is deduplicated and its RRF score is combined."""
         store = ElasticsearchVectorStore(index_name="test-index")
