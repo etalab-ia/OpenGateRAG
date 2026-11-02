@@ -43,8 +43,8 @@ opengaterag/docs/      unified Swagger/ReDoc merging the OpenGateLLM schema (unc
 ### Domain rules
 
 - A user **reads** their own collections and every public collection, including the documents in them and search over them. A user **writes** only to collections they own.
-- A collection the user cannot read returns `CollectionNotFoundError`, never a "forbidden" error, so the API does not reveal that another user's private collection exists. The same applies to documents.
-- Making a collection public requires `user.create_public_collection`.
+- A collection the user cannot read returns `CollectionNotFoundError`, never a "forbidden" error, so the API does not reveal that another user's private collection exists. The same applies to documents. A write to a collection the user does not own also returns `CollectionNotFoundError`, even when it is public.
+- Creating a public collection requires `user.create_public_collection`. Visibility is set at creation and cannot be changed: `PATCH` edits only `name` and `description`.
 - Storage = the sum of document sizes in tokens across the user's collections. Check `current + new document <= storage_limit`, where `null` means unlimited, **before** writing anything.
 - The `user` row is upserted on the user's first write with `settings.storage_default_limit`. Existing rows, including raised limits, are never overwritten. `collection.user_id` is the OpenGateLLM user id, with no foreign key to `user`.
 
@@ -134,7 +134,7 @@ Verbs: `Create`, `Update`, `Delete`, `GetOne` (by id), `Get<Plural>` (list). Nev
 - **Endpoints** are thin: build the command, call `execute()`, `match` the result, and map each error to its HTTP exception in `infrastructure/fastapi/endpoints/exceptions.py`. Never wrap a use case in `try/except Exception`.
 - **Routes:** `RouterName` (switchable routers + `module_path`) and `EndpointRoute` (mount paths) are separate enums. Never build an `EndpointRoute` from a `RouterName`. A module without a `RouterName` member is never imported.
 - **Responses** carry `object` (`"collection"`, `"document"`, `"search_result"`, `"list"`). Paginated lists are `{object: "list", total, offset, limit, data}`. Build them with `Response.model_validate(entity, from_attributes=True)`, never a hand-written mapper. Foreign keys are `*_id` (`user_id`, not `owner`). Timestamps are Unix `int` in the API and timezone-aware UTC `datetime` everywhere else.
-- **`Update<Noun>Body` is a full replacement:** every persisted field is required.
+- **`Update<Noun>Body` is a full replacement:** every editable field is required.
 - **Sessions:** `get_postgres_session` (transactional) serves collection CRUD and reads. `get_autocommit_postgres_session` serves every use case that calls Meilisearch (create/delete document, delete collection, search). Choose in the DI factory, and never mix the two in one use case.
 - **HTTP clients** (Meilisearch, OpenGateLLM) are shared `httpx.AsyncClient`s created in the lifespan, not one client per request. The official `meilisearch` Python client is synchronous and would block the event loop.
 - **Imports:** relative single-dot imports only for siblings and `__init__.py` re-exports, absolute imports everywhere else. A module never imports from its own package root.
@@ -150,6 +150,7 @@ The first slice of each pattern. Copy it when adding the same kind of code. Path
 | Postgres repository | `infrastructure/postgres/_postgrescollectionrepository.py` |
 | Postgres query (view) | `infrastructure/postgres/_postgrescollectionquery.py` |
 | Read-access check in a use case | `use_cases/collections/_getonecollectionusecase.py` (`Collection.is_readable_by`) |
+| Write-access check in a use case | `use_cases/collections/_updatecollectionusecase.py` (`Collection.is_writable_by`) |
 | HTTP adapter on a shared client | `infrastructure/opengatellm/_opengatellmauthenticateduserquery.py` |
 | Endpoint, error mapping, auth | `infrastructure/fastapi/endpoints/collections.py`, `accesscontroller.py` |
 | DI factory | `create_collection_use_case_factory` in `dependencies.py` |
