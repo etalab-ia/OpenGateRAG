@@ -22,11 +22,15 @@ class PostgresCollectionQuery(CollectionQuery):
 
         return CollectionView.model_validate(row, from_attributes=True)
 
-    async def get_readable_collections(self, user_id: int, offset: int, limit: int) -> tuple[list[CollectionView], int]:
-        is_readable = or_(CollectionTable.user_id == user_id, CollectionTable.visibility == CollectionVisibility.PUBLIC)
+    async def get_readable_collections(self, user_id: int, name: str | None, visibility: CollectionVisibility | None, offset: int, limit: int) -> tuple[list[CollectionView], int]:  # fmt: off
+        filters = [or_(CollectionTable.user_id == user_id, CollectionTable.visibility == CollectionVisibility.PUBLIC)]
+        if name is not None:
+            filters.append(CollectionTable.name == name)
+        if visibility is not None:
+            filters.append(CollectionTable.visibility == visibility)
 
-        total = await self.postgres_session.scalar(select(func.count()).select_from(CollectionTable).where(is_readable))
-        statement = self._select_collection_views().where(is_readable).order_by(CollectionTable.id).offset(offset).limit(limit)
+        total = await self.postgres_session.scalar(select(func.count()).select_from(CollectionTable).where(*filters))
+        statement = self._select_collection_views().where(*filters).order_by(CollectionTable.id).offset(offset).limit(limit)
         rows = (await self.postgres_session.execute(statement)).all()
 
         return [CollectionView.model_validate(row, from_attributes=True) for row in rows], total

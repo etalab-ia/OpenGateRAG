@@ -6,6 +6,7 @@ from opengaterag.api.dependencies import (
     get_one_collection_use_case_factory,
     update_collection_use_case_factory,
 )
+from opengaterag.api.domain.collection.entities import CollectionVisibility
 from opengaterag.api.domain.collection.errors import CollectionNotFoundError, PublicCollectionNotAllowedError
 from opengaterag.api.domain.user.views import AuthenticatedUserView
 from opengaterag.api.infrastructure.fastapi.accesscontroller import AccessController
@@ -55,6 +56,8 @@ async def create_collection(
 
 @router.get(path=EndpointRoute.COLLECTIONS)
 async def get_collections(
+    name: str | None = Query(default=None, description="Return only the collections with exactly this name."),
+    visibility: CollectionVisibility | None = Query(default=None, description="Return only the collections with this visibility."),
     offset: int = Query(default=0, ge=0, description="Number of collections to skip."),
     limit: int = Query(default=10, ge=1, le=100, description="Maximum number of collections to return."),
     user: AuthenticatedUserView = Security(AccessController()),
@@ -63,7 +66,7 @@ async def get_collections(
     """
     Get the collections you own and the public collections.
     """
-    command = GetCollectionsCommand(user_id=user.id, offset=offset, limit=limit)
+    command = GetCollectionsCommand(user_id=user.id, name=name, visibility=visibility, offset=offset, limit=limit)
     result = await get_collections_use_case.execute(command)
 
     return CollectionsResponse.model_validate(result, from_attributes=True)

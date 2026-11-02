@@ -38,8 +38,12 @@ class TestGetCollectionsUseCase:
         mock_collection_query.get_readable_collections.return_value = ([COLLECTION_VIEW], 12)
 
         # Act
-        result = await use_case.execute(GetCollectionsCommand(user_id=USER_ID, offset=5, limit=1))
+        result = await use_case.execute(
+            GetCollectionsCommand(user_id=USER_ID, name="my-collection", visibility=CollectionVisibility.PRIVATE, offset=5, limit=1)
+        )
 
         # Assert
         assert result == GetCollectionsUseCaseSuccess(data=[COLLECTION_VIEW], total=12, offset=5, limit=1)
-        mock_collection_query.get_readable_collections.assert_awaited_once_with(user_id=USER_ID, offset=5, limit=1)
+        mock_collection_query.get_readable_collections.assert_awaited_once_with(
+            user_id=USER_ID, name="my-collection", visibility=CollectionVisibility.PRIVATE, offset=5, limit=1
+        )

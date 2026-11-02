@@ -32,7 +32,7 @@ class CollectionResponse(BaseModel):
 
 class CollectionsResponse(BaseModel):
     object: Annotated[Literal["list"], Field(default="list", description="Type of the object.")]
-    total: Annotated[int, Field(description="Total number of collections you can read.")]
+    total: Annotated[int, Field(description="Total number of collections you can read that match the filters.")]
     offset: Annotated[int, Field(description="Number of collections skipped.")]
     limit: Annotated[int, Field(description="Maximum number of collections returned.")]
     data: Annotated[list[CollectionResponse], Field(description="The collections of this page.")]

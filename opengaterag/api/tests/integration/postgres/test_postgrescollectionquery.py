@@ -6,8 +6,8 @@ from opengaterag.api.infrastructure.postgres.models import Collection as Collect
 from opengaterag.api.infrastructure.postgres.models import Document as DocumentTable
 
 
-async def _add_collection(db_session, documents: int = 0, user_id: int = 42, visibility: CollectionVisibility = CollectionVisibility.PRIVATE) -> int:
-    collection = CollectionTable(user_id=user_id, name="my-collection", description=None, visibility=visibility)
+async def _add_collection(db_session, documents: int = 0, user_id: int = 42, name: str = "my-collection", visibility: CollectionVisibility = CollectionVisibility.PRIVATE) -> int:  # fmt: off
+    collection = CollectionTable(user_id=user_id, name=name, description=None, visibility=visibility)
     db_session.add(collection)
     await db_session.flush()
     db_session.add_all(DocumentTable(collection_id=collection.id, name=f"document-{index}.pdf") for index in range(documents))
@@ -52,11 +52,38 @@ class TestGetReadableCollections:
         query = PostgresCollectionQuery(postgres_session=db_session)
 
         # Act
-        collections, total = await query.get_readable_collections(user_id=42, offset=0, limit=10)
+        collections, total = await query.get_readable_collections(user_id=42, name=None, visibility=None, offset=0, limit=10)
 
         # Assert
         assert [collection.id for collection in collections] == [own_private, own_public, other_public]
         assert total == 3
+
+    async def test_should_not_return_private_collection_of_other_user_when_filtering_by_private_visibility(self, db_session):
+        # Arrange
+        own_private = await _add_collection(db_session, user_id=42)
+        await _add_collection(db_session, user_id=42, visibility=CollectionVisibility.PUBLIC)
+        await _add_collection(db_session, user_id=43)
+        query = PostgresCollectionQuery(postgres_session=db_session)
+
+        # Act
+        collections, total = await query.get_readable_collections(user_id=42, name=None, visibility=CollectionVisibility.PRIVATE, offset=0, limit=10)
+
+        # Assert
+        assert [collection.id for collection in collections] == [own_private]
+        assert total == 1
+
+    async def test_should_return_only_collections_with_exact_name(self, db_session):
+        # Arrange
+        wanted = await _add_collection(db_session, name="wanted")
+        await _add_collection(db_session, name="wanted-too")
+        query = PostgresCollectionQuery(postgres_session=db_session)
+
+        # Act
+        collections, total = await query.get_readable_collections(user_id=42, name="wanted", visibility=None, offset=0, limit=10)
+
+        # Assert
+        assert [collection.id for collection in collections] == [wanted]
+        assert total == 1
 
     async def test_should_return_requested_page_with_total_of_all_pages(self, db_session):
         # Arrange
@@ -64,7 +91,7 @@ class TestGetReadableCollections:
         query = PostgresCollectionQuery(postgres_session=db_session)
 
         # Act
-        collections, total = await query.get_readable_collections(user_id=42, offset=1, limit=2)
+        collections, total = await query.get_readable_collections(user_id=42, name=None, visibility=None, offset=1, limit=2)
 
         # Assert
         assert [collection.id for collection in collections] == collection_ids[1:3]
