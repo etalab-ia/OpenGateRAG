@@ -151,6 +151,7 @@ The first slice of each pattern. Copy it when adding the same kind of code. Path
 | Postgres query (view) | `infrastructure/postgres/_postgrescollectionquery.py` |
 | Read-access check in a use case | `use_cases/collections/_getonecollectionusecase.py` (`Collection.is_readable_by`) |
 | Write-access check in a use case | `use_cases/collections/_updatecollectionusecase.py` (`Collection.is_writable_by`) |
+| Paginated list | `use_cases/collections/_getcollectionsusecase.py`, `PostgresCollectionQuery.get_readable_collections`, `get_collections` in `infrastructure/fastapi/endpoints/collections.py` (`offset`, `limit` default 10, max 100) |
 | HTTP adapter on a shared client | `infrastructure/opengatellm/_opengatellmauthenticateduserquery.py` |
 | Endpoint, error mapping, auth | `infrastructure/fastapi/endpoints/collections.py`, `accesscontroller.py` |
 | DI factory | `create_collection_use_case_factory` in `dependencies.py` |
