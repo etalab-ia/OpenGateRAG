@@ -148,11 +148,14 @@ The first slice of each pattern. Copy it when adding the same kind of code. Path
 | Domain context (entities, view, errors, ports) | `domain/collection/` |
 | Use case | `use_cases/collections/_createcollectionusecase.py` |
 | Postgres repository | `infrastructure/postgres/_postgrescollectionrepository.py` |
+| Postgres query (view) | `infrastructure/postgres/_postgrescollectionquery.py` |
+| Read-access check in a use case | `use_cases/collections/_getonecollectionusecase.py` (`Collection.is_readable_by`) |
 | HTTP adapter on a shared client | `infrastructure/opengatellm/_opengatellmauthenticateduserquery.py` |
 | Endpoint, error mapping, auth | `infrastructure/fastapi/endpoints/collections.py`, `accesscontroller.py` |
 | DI factory | `create_collection_use_case_factory` in `dependencies.py` |
 | Unit use case test | `tests/unit/use_case/collections/test_createcollectionusecase.py` |
-| Integration endpoint / Postgres tests | `tests/integration/endpoints/test_create_collection.py`, `tests/integration/postgres/` |
+| Unit domain test | `tests/unit/domain/collection/test_collectionentities.py` |
+| Integration endpoint / Postgres tests | `tests/integration/endpoints/test_get_one_collection.py`, `tests/integration/postgres/` |
 
 ---
 
@@ -168,12 +171,12 @@ Integration tests create the `TEST_POSTGRES_URL` database (default `postgresql+a
 |---|---|---|
 | Unit use case | `opengaterag/api/tests/unit/use_case/<area>/` | every distinct `execute()` branch. Ports are mocked with `create_autospec(Port, instance=True, spec_set=True)`, never a bare mock |
 | Unit domain | `opengaterag/api/tests/unit/domain/<context>/test_<context>entities.py` | entity methods |
-| Integration endpoint | `opengaterag/api/tests/integration/endpoints/` | happy path, auth, one row per mapped error (mocked use case). `AuthenticatedUserQuery` is stubbed, never OpenGateLLM |
+| Integration endpoint | `opengaterag/api/tests/integration/endpoints/` | happy path, one row per mapped error (mocked use case). No per-endpoint auth or request-validation tests. `AuthenticatedUserQuery` is stubbed, never OpenGateLLM |
 | Integration Postgres | `opengaterag/api/tests/integration/postgres/` | persist/read, constraints, access filters |
 | Integration Meilisearch | `opengaterag/api/tests/integration/meilisearch/` | real Meilisearch with a deterministic stub embedder: bootstrap, add/delete by filter, `metadata.<key>` filters, filter escaping, task failure mapping. Never mock the Meilisearch HTTP API |
 | e2e | `.github/tests/e2e/` | full stack against a real OpenGateLLM (semantic and hybrid ranking). No refresh hooks: writes are visible once they return |
 
-Unit test names start with `test_should_`. Mocks are prefixed `mock_`. Use `# Arrange` / `# Act` / `# Assert`. Every test directory has an `__init__.py`.
+Assert only what the test is about, not every field of the response. Unit test names start with `test_should_`. Mocks are prefixed `mock_`. Use `# Arrange` / `# Act` / `# Assert`. Every test directory has an `__init__.py`.
 
 ## Commands
 
