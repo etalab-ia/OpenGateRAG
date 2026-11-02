@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 @dataclass
 class PublicCollectionNotAllowedError:
-    user_id: int
+    pass
 
 
 @dataclass
 class CollectionNotFoundError:
-    collection_id: int
+    pass

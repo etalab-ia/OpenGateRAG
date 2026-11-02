@@ -89,5 +89,5 @@ class TestCreateCollectionUseCase:
         result = await use_case.execute(_command(CollectionVisibility.PUBLIC))
 
         # Assert
-        assert result == PublicCollectionNotAllowedError(user_id=USER_ID)
+        assert result == PublicCollectionNotAllowedError()
         mock_collection_repository.create_collection.assert_not_awaited()

@@ -33,7 +33,7 @@ class CreateCollectionUseCase:
         user = await self.user_repository.get_or_create_user(user_id=command.user_id, storage_limit=self.storage_default_limit)
 
         if command.visibility == CollectionVisibility.PUBLIC and not user.create_public_collection:
-            return PublicCollectionNotAllowedError(user_id=user.id)
+            return PublicCollectionNotAllowedError()
 
         collection = await self.collection_repository.create_collection(
             user_id=user.id,

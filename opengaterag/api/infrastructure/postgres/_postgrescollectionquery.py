@@ -18,6 +18,6 @@ class PostgresCollectionQuery(CollectionQuery):
         row = (await self.postgres_session.execute(statement)).one_or_none()
 
         if row is None:
-            return CollectionNotFoundError(collection_id=collection_id)
+            return CollectionNotFoundError()
 
         return CollectionView.model_validate(row, from_attributes=True)

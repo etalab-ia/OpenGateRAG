@@ -1,8 +1,9 @@
-from sqlalchemy import insert
+from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from opengaterag.api.domain.collection import CollectionRepository
 from opengaterag.api.domain.collection.entities import Collection, CollectionVisibility
+from opengaterag.api.domain.collection.errors import CollectionNotFoundError
 from opengaterag.api.infrastructure.postgres.models import Collection as CollectionTable
 
 
@@ -17,3 +18,12 @@ class PostgresCollectionRepository(CollectionRepository):
         result = await self.postgres_session.execute(statement)
 
         return Collection.model_validate(result.scalar_one(), from_attributes=True)
+
+    async def update_collection(self, collection_id: int, name: str, description: str | None) -> Collection | CollectionNotFoundError:
+        statement = update(CollectionTable).where(CollectionTable.id == collection_id).values(name=name, description=description).returning(CollectionTable)  # fmt: off
+        row = (await self.postgres_session.execute(statement)).scalar_one_or_none()
+
+        if row is None:
+            return CollectionNotFoundError()
+
+        return Collection.model_validate(row, from_attributes=True)

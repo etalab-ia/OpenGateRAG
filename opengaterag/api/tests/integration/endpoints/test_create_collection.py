@@ -37,7 +37,7 @@ class TestCreateCollection:
     @pytest.mark.parametrize(
         "use_case_result,expected_status,expected_detail",
         [
-            (PublicCollectionNotAllowedError(user_id=AUTHENTICATED_USER_ID), 403, "You are not allowed to make a collection public."),
+            (PublicCollectionNotAllowedError(), 403, "You are not allowed to make a collection public."),
         ],
     )
     async def test_should_map_error_to_http_status(

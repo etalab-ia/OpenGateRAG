@@ -13,6 +13,11 @@ class CreateCollectionBody(BaseModel):
     visibility: Annotated[CollectionVisibility, Field(default=CollectionVisibility.PRIVATE, description="Public collections are readable by every user, private collections only by their owner. Making a collection public requires the right to do so.")]  # fmt: off
 
 
+class UpdateCollectionBody(BaseModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1), Field(description="Name of the collection.", examples=["my-collection"])]  # fmt: off
+    description: Annotated[str | None, Field(description="Description of the collection.")]
+
+
 class CollectionResponse(BaseModel):
     object: Annotated[Literal["collection"], Field(default="collection", description="Type of the object.")]
     id: Annotated[int, Field(description="ID of the collection.")]
