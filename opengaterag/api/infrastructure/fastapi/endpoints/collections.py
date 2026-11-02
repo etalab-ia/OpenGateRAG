@@ -1,16 +1,28 @@
-from fastapi import APIRouter, Body, Depends, Path, Security
+from fastapi import APIRouter, Body, Depends, Path, Query, Security
 
-from opengaterag.api.dependencies import create_collection_use_case_factory, get_one_collection_use_case_factory, update_collection_use_case_factory
+from opengaterag.api.dependencies import (
+    create_collection_use_case_factory,
+    get_collections_use_case_factory,
+    get_one_collection_use_case_factory,
+    update_collection_use_case_factory,
+)
 from opengaterag.api.domain.collection.errors import CollectionNotFoundError, PublicCollectionNotAllowedError
 from opengaterag.api.domain.user.views import AuthenticatedUserView
 from opengaterag.api.infrastructure.fastapi.accesscontroller import AccessController
 from opengaterag.api.infrastructure.fastapi.endpoints.exceptions import CollectionNotFoundHTTPException, PublicCollectionNotAllowedHTTPException
 from opengaterag.api.infrastructure.fastapi.routes import EndpointRoute, RouterName
-from opengaterag.api.infrastructure.fastapi.schemas.collections import CollectionResponse, CreateCollectionBody, UpdateCollectionBody
+from opengaterag.api.infrastructure.fastapi.schemas.collections import (
+    CollectionResponse,
+    CollectionsResponse,
+    CreateCollectionBody,
+    UpdateCollectionBody,
+)
 from opengaterag.api.use_cases.collections import (
     CreateCollectionCommand,
     CreateCollectionUseCase,
     CreateCollectionUseCaseSuccess,
+    GetCollectionsCommand,
+    GetCollectionsUseCase,
     GetOneCollectionCommand,
     GetOneCollectionUseCase,
     GetOneCollectionUseCaseSuccess,
@@ -39,6 +51,22 @@ async def create_collection(
             return CollectionResponse.model_validate(collection, from_attributes=True)
         case PublicCollectionNotAllowedError():
             raise PublicCollectionNotAllowedHTTPException()
+
+
+@router.get(path=EndpointRoute.COLLECTIONS)
+async def get_collections(
+    offset: int = Query(default=0, ge=0, description="Number of collections to skip."),
+    limit: int = Query(default=10, ge=1, le=100, description="Maximum number of collections to return."),
+    user: AuthenticatedUserView = Security(AccessController()),
+    get_collections_use_case: GetCollectionsUseCase = Depends(get_collections_use_case_factory),
+) -> CollectionsResponse:
+    """
+    Get the collections you own and the public collections.
+    """
+    command = GetCollectionsCommand(user_id=user.id, offset=offset, limit=limit)
+    result = await get_collections_use_case.execute(command)
+
+    return CollectionsResponse.model_validate(result, from_attributes=True)
 
 
 @router.get(path=EndpointRoute.COLLECTION)
