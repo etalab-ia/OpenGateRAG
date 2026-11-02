@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Body, Depends, Path, Security
 
-from opengaterag.api.dependencies import create_collection_use_case_factory, get_one_collection_use_case_factory
+from opengaterag.api.dependencies import create_collection_use_case_factory, get_one_collection_use_case_factory, update_collection_use_case_factory
 from opengaterag.api.domain.collection.errors import CollectionNotFoundError, PublicCollectionNotAllowedError
 from opengaterag.api.domain.user.views import AuthenticatedUserView
 from opengaterag.api.infrastructure.fastapi.accesscontroller import AccessController
 from opengaterag.api.infrastructure.fastapi.endpoints.exceptions import CollectionNotFoundHTTPException, PublicCollectionNotAllowedHTTPException
 from opengaterag.api.infrastructure.fastapi.routes import EndpointRoute, RouterName
-from opengaterag.api.infrastructure.fastapi.schemas.collections import CollectionResponse, CreateCollectionBody
+from opengaterag.api.infrastructure.fastapi.schemas.collections import CollectionResponse, CreateCollectionBody, UpdateCollectionBody
 from opengaterag.api.use_cases.collections import (
     CreateCollectionCommand,
     CreateCollectionUseCase,
@@ -14,6 +14,9 @@ from opengaterag.api.use_cases.collections import (
     GetOneCollectionCommand,
     GetOneCollectionUseCase,
     GetOneCollectionUseCaseSuccess,
+    UpdateCollectionCommand,
+    UpdateCollectionUseCase,
+    UpdateCollectionUseCaseSuccess,
 )
 
 router = APIRouter(prefix="/v1", tags=[RouterName.COLLECTIONS.title()])
@@ -52,6 +55,26 @@ async def get_one_collection(
 
     match result:
         case GetOneCollectionUseCaseSuccess(collection=collection):
+            return CollectionResponse.model_validate(collection, from_attributes=True)
+        case CollectionNotFoundError():
+            raise CollectionNotFoundHTTPException()
+
+
+@router.patch(path=EndpointRoute.COLLECTION)
+async def update_collection(
+    collection_id: int = Path(description="ID of the collection."),
+    body: UpdateCollectionBody = Body(description="The collection update request. Both fields are replaced."),
+    user: AuthenticatedUserView = Security(AccessController()),
+    update_collection_use_case: UpdateCollectionUseCase = Depends(update_collection_use_case_factory),
+) -> CollectionResponse:
+    """
+    Update the name and description of a collection you own. Both fields are replaced.
+    """
+    command = UpdateCollectionCommand(user_id=user.id, collection_id=collection_id, name=body.name, description=body.description)
+    result = await update_collection_use_case.execute(command)
+
+    match result:
+        case UpdateCollectionUseCaseSuccess(collection=collection):
             return CollectionResponse.model_validate(collection, from_attributes=True)
         case CollectionNotFoundError():
             raise CollectionNotFoundHTTPException()
