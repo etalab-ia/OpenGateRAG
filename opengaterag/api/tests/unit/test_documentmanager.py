@@ -147,8 +147,13 @@ async def test_get_collections_filter_by_visibility():
 
     assert mock_session.execute.called
     call_args = mock_session.execute.call_args
-    statement_str = str(call_args[1]["statement"])
+    statement = call_args[1]["statement"]
+    statement_str = str(statement)
     assert "visibility" in statement_str.lower()
+    compiled = statement.compile()
+    assert "collection.user_id =" in str(compiled)
+    assert "collection.visibility =" in str(compiled)
+    assert CollectionVisibility.PRIVATE in compiled.params.values()
 
     mock_session.execute.return_value = mock_public_result
     collections = await document_manager.get_collections(
