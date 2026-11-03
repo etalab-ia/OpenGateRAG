@@ -7,7 +7,12 @@ from opengaterag.api.domain.user import AuthenticatedUserQuery
 from opengaterag.api.infrastructure.configuration import Configuration, get_configuration
 from opengaterag.api.infrastructure.context import global_context
 from opengaterag.api.infrastructure.opengatellm import OpenGateLLMAuthenticatedUserQuery
-from opengaterag.api.infrastructure.postgres import PostgresCollectionQuery, PostgresCollectionRepository, PostgresUserRepository
+from opengaterag.api.infrastructure.postgres import (
+    PostgresCollectionQuery,
+    PostgresCollectionRepository,
+    PostgresDocumentRepository,
+    PostgresUserRepository,
+)
 from opengaterag.api.use_cases.collections import (
     CreateCollectionUseCase,
     DeleteCollectionUseCase,
@@ -15,6 +20,7 @@ from opengaterag.api.use_cases.collections import (
     GetOneCollectionUseCase,
     UpdateCollectionUseCase,
 )
+from opengaterag.api.use_cases.documents import GetOneDocumentUseCase
 
 
 async def get_postgres_session() -> AsyncGenerator[AsyncSession]:
@@ -64,5 +70,13 @@ def update_collection_use_case_factory(postgres_session: AsyncSession = Depends(
 def delete_collection_use_case_factory(postgres_session: AsyncSession = Depends(get_postgres_session)) -> DeleteCollectionUseCase:
     return DeleteCollectionUseCase(
         collection_repository=PostgresCollectionRepository(postgres_session=postgres_session),
+        collection_query=PostgresCollectionQuery(postgres_session=postgres_session),
+    )
+
+
+# document use cases
+def get_one_document_use_case_factory(postgres_session: AsyncSession = Depends(get_postgres_session)) -> GetOneDocumentUseCase:
+    return GetOneDocumentUseCase(
+        document_repository=PostgresDocumentRepository(postgres_session=postgres_session),
         collection_query=PostgresCollectionQuery(postgres_session=postgres_session),
     )

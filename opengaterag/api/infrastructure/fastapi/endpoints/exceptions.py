@@ -26,3 +26,11 @@ class CollectionNotFoundHTTPException(HTTPException):
 
     def __init__(self) -> None:
         super().__init__(status_code=self.status_code, detail=self.detail)
+
+
+class DocumentNotFoundHTTPException(HTTPException):
+    status_code = 404
+    detail = "Document not found."
+
+    def __init__(self) -> None:
+        super().__init__(status_code=self.status_code, detail=self.detail)

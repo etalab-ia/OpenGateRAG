@@ -3,6 +3,7 @@ from enum import StrEnum
 
 class RouterName(StrEnum):
     COLLECTIONS = ("collections", "opengaterag.api.infrastructure.fastapi.endpoints.collections")
+    DOCUMENTS = ("documents", "opengaterag.api.infrastructure.fastapi.endpoints.documents")
     MONITORING = ("monitoring", None)
 
     def __new__(cls, value: str, module_path: str):
@@ -16,4 +17,5 @@ class RouterName(StrEnum):
 class EndpointRoute(StrEnum):
     COLLECTIONS = "/collections"
     COLLECTION = "/collections/{collection_id}"
+    DOCUMENT = "/documents/{document_id}"
     METRICS = "/metrics"
