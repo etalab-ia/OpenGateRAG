@@ -21,7 +21,7 @@ dependencies:
     index_name: ${MEILISEARCH_INDEX_NAME:-opengaterag}
     # Called by Meilisearch, not by the API. It must be a public address: Meilisearch rejects internal IPs by default.
     embedder_url: ${MEILISEARCH_EMBEDDER_URL:-https://albert.api.dev.etalab.gouv.fr/v1/embeddings}
-    embedder_api_key: ${MEILISEARCH_EMBEDDER_API_KEY:-changeme}
+    embedder_api_key: ${MEILISEARCH_EMBEDDER_API_KEY:-}
     # embedder_name: default
     # index_language: fra  # detected by Meilisearch by default
     # task_timeout: 300
