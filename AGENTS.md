@@ -86,7 +86,7 @@ There are **no chunk endpoints**. Chunks are an internal detail of indexing: the
 - The embedder authenticates with a dedicated OpenGateLLM **service key**. Embedding consumption is therefore not billed to the caller's key, and search responses have no `usage` field.
 - `documentTemplateMaxBytes` defaults to **400** and is documented as truncating the text sent to the embedder. Derive it from the maximum chunk size (`settings.chunk_max_characters` × 4 bytes), so no chunk can be cut if Meilisearch applies it. Measured on v1.56.1, it did not truncate `{{doc.content}}`, even at 400: **the splitter's maximum is what protects the embedder**, so keep it within the embedding model's context.
 
-**Bootstrap** (`lifespan.py`) creates the index and its settings when they are missing. It waits only for the settings task, which runs after the index creation because an index's tasks run in order. Workers bootstrap concurrently, so a creation task may fail because another worker got there first, which is harmless. An index without an embedder gets its settings applied, so a crashed start recovers. When the index already exists and its embedder settings (`source`, `url`, `request`, `response`, `dimensions`, `documentTemplate`, `documentTemplateMaxBytes`) differ from the configuration, the API **refuses to start** and names the fields that differ. Most of these changes make Meilisearch re-embed every chunk, so a restart must never trigger that. Do not compare `apiKey`: Meilisearch returns it partially hidden. The other settings of an existing index are left as they are, so changing `index_language` has no effect until they are updated by hand.
+**Bootstrap** (`lifespan.py`) runs on every start: it enqueues the index creation, then applies the index settings and waits for that task. An index's tasks run in order, so the settings always follow the creation. When the index already exists, the creation task just fails, which is harmless. Changing the embedder configuration therefore re-embeds every chunk on the next restart, which is acceptable for the pilot.
 
 **Tasks.** Meilisearch writes are asynchronous. A `ChunkIndex` method returns only after its task has finished (bounded wait, `task_timeout`). Task uids never leave the adapter. A failed task with a known `error.code` maps to a domain error, and an unknown code is raised. Meilisearch processes an index's tasks in the order they were enqueued, so a compensating delete enqueued after a timed-out add still wins.
 
@@ -159,7 +159,6 @@ The first slice of each pattern. Copy it when adding the same kind of code. Path
 | Unit domain test | `tests/unit/domain/collection/test_collectionentities.py` |
 | Integration endpoint / Postgres tests | `tests/integration/endpoints/test_get_one_collection.py`, `tests/integration/postgres/` |
 | Meilisearch index bootstrap | `infrastructure/meilisearch/_meilisearchindexbootstrap.py` |
-| Integration Meilisearch tests, stub embedder | `tests/integration/meilisearch/` |
 
 ---
 
@@ -177,7 +176,7 @@ Integration tests create the `TEST_POSTGRES_URL` database (default `postgresql+a
 | Unit domain | `opengaterag/api/tests/unit/domain/<context>/test_<context>entities.py` | entity methods |
 | Integration endpoint | `opengaterag/api/tests/integration/endpoints/` | happy path, one row per mapped error (mocked use case). No per-endpoint auth or request-validation tests. `AuthenticatedUserQuery` is stubbed, never OpenGateLLM |
 | Integration Postgres | `opengaterag/api/tests/integration/postgres/` | persist/read, constraints, access filters |
-| Integration Meilisearch | `opengaterag/api/tests/integration/meilisearch/` | real Meilisearch with a deterministic stub embedder, which runs in the test process and records what Meilisearch sends it (tests that embed are skipped unless `TEST_MEILISEARCH_ALLOWS_PRIVATE_IPS` says the instance allows private addresses): bootstrap, add/delete by filter, `metadata.<key>` filters, filter escaping, task failure mapping. Never mock the Meilisearch HTTP API |
+| Integration Meilisearch | `opengaterag/api/tests/integration/meilisearch/` | real Meilisearch: bootstrap, add/delete by filter, `metadata.<key>` filters, filter escaping, task failure mapping. Never mock the Meilisearch HTTP API |
 | e2e | `.github/tests/e2e/` | full stack against a real OpenGateLLM (semantic and hybrid ranking). No refresh hooks: writes are visible once they return |
 
 Assert only what the test is about, not every field of the response. Unit test names start with `test_should_`. Mocks are prefixed `mock_`. Use `# Arrange` / `# Act` / `# Assert`. Every test directory has an `__init__.py`.
