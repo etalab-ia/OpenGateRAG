@@ -8,7 +8,13 @@ from opengaterag.api.infrastructure.configuration import Configuration, get_conf
 from opengaterag.api.infrastructure.context import global_context
 from opengaterag.api.infrastructure.opengatellm import OpenGateLLMAuthenticatedUserQuery
 from opengaterag.api.infrastructure.postgres import PostgresCollectionQuery, PostgresCollectionRepository, PostgresUserRepository
-from opengaterag.api.use_cases.collections import CreateCollectionUseCase, GetCollectionsUseCase, GetOneCollectionUseCase, UpdateCollectionUseCase
+from opengaterag.api.use_cases.collections import (
+    CreateCollectionUseCase,
+    DeleteCollectionUseCase,
+    GetCollectionsUseCase,
+    GetOneCollectionUseCase,
+    UpdateCollectionUseCase,
+)
 
 
 async def get_postgres_session() -> AsyncGenerator[AsyncSession]:
@@ -50,6 +56,13 @@ def get_one_collection_use_case_factory(postgres_session: AsyncSession = Depends
 
 def update_collection_use_case_factory(postgres_session: AsyncSession = Depends(get_postgres_session)) -> UpdateCollectionUseCase:
     return UpdateCollectionUseCase(
+        collection_repository=PostgresCollectionRepository(postgres_session=postgres_session),
+        collection_query=PostgresCollectionQuery(postgres_session=postgres_session),
+    )
+
+
+def delete_collection_use_case_factory(postgres_session: AsyncSession = Depends(get_postgres_session)) -> DeleteCollectionUseCase:
+    return DeleteCollectionUseCase(
         collection_repository=PostgresCollectionRepository(postgres_session=postgres_session),
         collection_query=PostgresCollectionQuery(postgres_session=postgres_session),
     )

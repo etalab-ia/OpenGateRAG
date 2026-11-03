@@ -1,4 +1,4 @@
-from sqlalchemy import insert, update
+from sqlalchemy import delete, insert, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from opengaterag.api.domain.collection import CollectionRepository
@@ -27,3 +27,12 @@ class PostgresCollectionRepository(CollectionRepository):
             return CollectionNotFoundError()
 
         return Collection.model_validate(row, from_attributes=True)
+
+    async def delete_collection(self, collection_id: int) -> None | CollectionNotFoundError:
+        statement = delete(CollectionTable).where(CollectionTable.id == collection_id).returning(CollectionTable.id)
+        deleted_id = (await self.postgres_session.execute(statement)).scalar_one_or_none()
+
+        if deleted_id is None:
+            return CollectionNotFoundError()
+
+        return None

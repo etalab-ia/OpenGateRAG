@@ -6,6 +6,7 @@ from opengaterag.api.domain.collection.entities import Collection, CollectionVis
 from opengaterag.api.domain.collection.errors import CollectionNotFoundError
 from opengaterag.api.infrastructure.postgres import PostgresCollectionRepository
 from opengaterag.api.infrastructure.postgres.models import Collection as CollectionTable
+from opengaterag.api.infrastructure.postgres.models import Document as DocumentTable
 
 
 class TestCreateCollection:
@@ -54,6 +55,35 @@ class TestUpdateCollection:
 
         # Act
         result = await repository.update_collection(collection_id=999_999, name="new-name", description=None)
+
+        # Assert
+        assert result == CollectionNotFoundError()
+
+
+class TestDeleteCollection:
+    async def test_should_delete_collection_and_its_documents(self, db_session):
+        # Arrange
+        repository = PostgresCollectionRepository(postgres_session=db_session)
+        collection = CollectionTable(user_id=42, name="my-collection", description=None, visibility=CollectionVisibility.PRIVATE)
+        db_session.add(collection)
+        await db_session.flush()
+        db_session.add(DocumentTable(collection_id=collection.id, name="document.pdf"))
+        await db_session.flush()
+
+        # Act
+        result = await repository.delete_collection(collection_id=collection.id)
+
+        # Assert
+        assert result is None
+        assert await db_session.scalar(select(CollectionTable.id).where(CollectionTable.id == collection.id)) is None
+        assert await db_session.scalar(select(DocumentTable.id).where(DocumentTable.collection_id == collection.id)) is None
+
+    async def test_should_return_collection_not_found_error_when_collection_does_not_exist(self, db_session):
+        # Arrange
+        repository = PostgresCollectionRepository(postgres_session=db_session)
+
+        # Act
+        result = await repository.delete_collection(collection_id=999_999)
 
         # Assert
         assert result == CollectionNotFoundError()
