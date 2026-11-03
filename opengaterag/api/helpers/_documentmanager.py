@@ -185,7 +185,7 @@ class DocumentManager:
         elif visibility == CollectionVisibility.PUBLIC:
             statement = statement.where(CollectionTable.visibility == CollectionVisibility.PUBLIC)
         else:
-            statement = statement.where(CollectionTable.user_id == user_id)
+            statement = statement.where(CollectionTable.user_id == user_id, CollectionTable.visibility == CollectionVisibility.PRIVATE)
 
         result = await postgres_session.execute(statement=statement)
         collections = [Collection(**row._asdict()) for row in result.all()]
