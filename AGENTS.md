@@ -45,6 +45,7 @@ opengaterag/docs/      unified Swagger/ReDoc merging the OpenGateLLM schema (unc
 - A user **reads** their own collections and every public collection, including the documents in them and search over them. A user **writes** only to collections they own.
 - A collection the user cannot read returns `CollectionNotFoundError`, never a "forbidden" error, so the API does not reveal that another user's private collection exists. The same applies to documents. A write to a collection the user does not own also returns `CollectionNotFoundError`, even when it is public.
 - Creating a public collection requires `user.create_public_collection`. Visibility is set at creation and cannot be changed: `PATCH` edits only `name` and `description`.
+- Moving a document (`PATCH` with another `collection_id`) requires owning both collections. A target the user does not own returns `CollectionNotFoundError`. Storage does not change, because both collections belong to the same user.
 - Storage = the sum of document sizes in tokens across the user's collections. Check `current + new document <= storage_limit`, where `null` means unlimited, **before** writing anything.
 - The `user` row is upserted on the user's first write with `settings.storage_default_limit`. Existing rows, including raised limits, are never overwritten. `collection.user_id` is the OpenGateLLM user id, with no foreign key to `user`.
 
@@ -55,14 +56,14 @@ opengaterag/docs/      unified Swagger/ReDoc merging the OpenGateLLM schema (unc
 | Route | Verbs |
 |---|---|
 | `/v1/collections` | `POST`, `GET` (paginated) |
-| `/v1/collections/{collection_id}` | `GET`, `PATCH` (full replacement), `DELETE` |
-| `/v1/documents` | `POST` (multipart, file required), `GET` (paginated) |
-| `/v1/documents/{document_id}` | `GET`, `DELETE` |
+| `/v1/collections/{collection_id}` | `GET`, `PATCH` (full replacement), `DELETE` (with its documents) |
+| `/v1/collections/{collection_id}/documents` | `POST` (multipart, file required), `GET` (paginated) |
+| `/v1/documents/{document_id}` | `GET`, `PATCH` (full replacement: `name`, `metadata`, `collection_id`), `DELETE` (with its chunks) |
 | `/v1/search` | `POST` |
 
 There are **no chunk endpoints**. Chunks are an internal detail of indexing: they have no id in the API and cannot be listed, fetched, added or deleted. A search result carries `content`, `score`, `document_id`, `collection_id` and `metadata`. It is not an addressable resource.
 
-**Read endpoints never call Meilisearch.** Document counts, sizes and chunk counts are stored in Postgres when a document is written.
+**Read endpoints never call Meilisearch.** Document counts, sizes, chunk counts and metadata are stored in Postgres when a document is written.
 
 ---
 
@@ -107,6 +108,7 @@ Postgres is the source of truth for ownership and access. Meilisearch holds the 
 
 - **Create document:** check collection → parse → count tokens → check storage → split → insert row (committed) → index chunks. If indexing fails, enqueue a delete of the document's chunks, delete the row, and return the error.
 - **Delete document or collection:** delete the chunks in Meilisearch and wait, **then** delete in Postgres. If the Postgres delete fails, the result is a document without chunks, which is visible and can be deleted again. The reverse order would leave chunks without a document: content the user believes is deleted but that search can still return.
+- **Update document:** update the chunks' `collection_id` and `metadata` in Meilisearch and wait, **then** update Postgres. If the Postgres update fails, sending the same `PATCH` again repairs it.
 
 ---
 
@@ -135,7 +137,7 @@ Verbs: `Create`, `Update`, `Delete`, `GetOne` (by id), `Get<Plural>` (list). Nev
 - **Routes:** `RouterName` (switchable routers + `module_path`) and `EndpointRoute` (mount paths) are separate enums. Never build an `EndpointRoute` from a `RouterName`. A module without a `RouterName` member is never imported.
 - **Responses** carry `object` (`"collection"`, `"document"`, `"search_result"`, `"list"`). Paginated lists are `{object: "list", total, offset, limit, data}`. Build them with `Response.model_validate(entity, from_attributes=True)`, never a hand-written mapper. Foreign keys are `*_id` (`user_id`, not `owner`). Timestamps are Unix `int` in the API and timezone-aware UTC `datetime` everywhere else.
 - **`Update<Noun>Body` is a full replacement:** every editable field is required.
-- **Sessions:** `get_postgres_session` (transactional) serves collection CRUD and reads. `get_autocommit_postgres_session` serves every use case that calls Meilisearch (create/delete document, delete collection, search). Choose in the DI factory, and never mix the two in one use case.
+- **Sessions:** `get_postgres_session` (transactional) serves collection CRUD and reads. `get_autocommit_postgres_session` serves every use case that calls Meilisearch (create/update/delete document, delete collection, search). Choose in the DI factory, and never mix the two in one use case.
 - **HTTP clients** (Meilisearch, OpenGateLLM) are shared `httpx.AsyncClient`s created in the lifespan, not one client per request. The official `meilisearch` Python client is synchronous and would block the event loop.
 - **Imports:** relative single-dot imports only for siblings and `__init__.py` re-exports, absolute imports everywhere else. A module never imports from its own package root.
 
@@ -150,6 +152,7 @@ The first slice of each pattern. Copy it when adding the same kind of code. Path
 | Postgres repository | `infrastructure/postgres/_postgrescollectionrepository.py` |
 | Postgres query (view) | `infrastructure/postgres/_postgrescollectionquery.py` |
 | Read-access check in a use case | `use_cases/collections/_getonecollectionusecase.py` (`Collection.is_readable_by`) |
+| Document access through its collection | `use_cases/documents/_getonedocumentusecase.py` (unreadable collection → `DocumentNotFoundError`) |
 | Write-access check in a use case | `use_cases/collections/_updatecollectionusecase.py` (`Collection.is_writable_by`) |
 | Paginated list | `use_cases/collections/_getcollectionsusecase.py`, `PostgresCollectionQuery.get_readable_collections`, `get_collections` in `infrastructure/fastapi/endpoints/collections.py` (`offset`, `limit` default 10, max 100, optional filters) |
 | HTTP adapter on a shared client | `infrastructure/opengatellm/_opengatellmauthenticateduserquery.py` |
