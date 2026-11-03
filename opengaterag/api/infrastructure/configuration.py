@@ -40,6 +40,21 @@ class PostgresDependency(ConfigBaseModel):
     url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, pattern=r"^postgresql\+asyncpg://")] = Field(..., description="PostgreSQL connection url.", examples=["postgresql+asyncpg://postgres:changeme@localhost:5432/postgres"])  # fmt: off
 
 
+class MeilisearchDependency(ConfigBaseModel):
+    """
+    Meilisearch is a required dependency of OpenGateRAG. It indexes the chunks of the documents and computes their embeddings by calling the OpenGateLLM embeddings endpoint.
+    """
+
+    url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(..., description="URL of the Meilisearch API.", examples=["http://localhost:7700"])  # fmt: off
+    api_key: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(..., description="Meilisearch API key. It must be allowed to manage indexes.")  # fmt: off
+    index_name: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[A-Za-z0-9_-]+$")] = Field(..., description="Name of the index that holds all chunks.", examples=["opengaterag"])  # fmt: off
+    index_language: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] | None = Field(default=None, description="Language of the chunks, as a Meilisearch locale. If not provided, Meilisearch detects it.", examples=["fra"])  # fmt: off
+    task_timeout: int = Field(default=300, ge=1, description="Maximum time in seconds to wait for a Meilisearch task. Indexing tasks include the embedding of the chunks.")  # fmt: off
+    embedder_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(default="default", description="Name of the embedder in the index settings.")  # fmt: off
+    embedder_url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(..., description="URL of the OpenGateLLM embeddings endpoint, resolved from the Meilisearch container. It is therefore configured separately from `opengatellm.url`.", examples=["http://api:8000/v1/embeddings"])  # fmt: off
+    embedder_api_key: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(..., description="OpenGateLLM service key used by Meilisearch to compute embeddings.")  # fmt: off
+
+
 class SentryDependency(ConfigBaseModel):
     """
     Sentry is an optional dependency of OpenGateLLM. Sentry helps you identify, diagnose, and fix errors in real-time.
@@ -53,6 +68,7 @@ class SentryDependency(ConfigBaseModel):
 class Dependencies(ConfigBaseModel):
     opengatellm: OpengateLLMDependency = Field(..., description="OpengateLLM is a required dependency of OpenGateRAG to embed the text in the vector store and retrieve user information.")  # fmt: off
     postgres: PostgresDependency = Field(..., description="Postgres is a required dependency of OpenGateRAG to store API data.")  # fmt: off
+    meilisearch: MeilisearchDependency = Field(..., description="Meilisearch is a required dependency of OpenGateRAG to index and search the chunks of the documents.")  # fmt: off
     sentry: SentryDependency | None = Field(default=None, description="Sentry is an optional dependency of OpenGateRAG. Sentry helps you identify, diagnose, and fix errors in real-time.")  # fmt: off
 
 
@@ -74,6 +90,9 @@ class Settings(ConfigBaseModel):
     # storage
     storage_default_limit: int | None = Field(default=10_000_000, ge=0, description="Default storage limit in tokens assigned to newly created users. If null, new users have no storage limit.")  # fmt: off
     storage_compute_tokenizer: Tokenizer = Field(default=Tokenizer.TIKTOKEN_GPT2, description="Tokenizer used to compute storage usage of the API.")
+
+    # chunks
+    chunk_max_characters: int = Field(default=2048, ge=1, description="Maximum size of a chunk in characters. It must fit in the context of the embedding model. Changing it updates the embedder settings of the index on the next start, which can re-embed every chunk.")  # fmt: off
 
     # general
     disabled_routers: list[RouterName] = Field(default_factory=list, description="Disabled routers to limits services of the API.", examples=[["embeddings"]], json_schema_extra={"default": []})  # fmt: off

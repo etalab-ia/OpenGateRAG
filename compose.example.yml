@@ -7,6 +7,7 @@ services:
     env_file: .env
     environment:
       - "OPENGATELLM_URL=${OPENGATELLM_URL:-http://api:8000}"
+      - "MEILISEARCH_URL=${MEILISEARCH_URL:-http://meilisearch:7700}"
     ports:
       - "${RAG_PORT:-8000}:8000"
     volumes:
@@ -33,6 +34,25 @@ services:
       retries: 5
       start_period: 60s
 
+  meilisearch:
+    image: getmeili/meilisearch:v1.56.1
+    restart: always
+    environment:
+      - "MEILI_ENV=production"
+      - "MEILI_MASTER_KEY=${MEILISEARCH_API_KEY:-changemechangeme}"
+      - "MEILI_NO_ANALYTICS=true"
+    ports:
+      - "${MEILISEARCH_PORT:-7700}:7700"
+    volumes:
+      - meilisearch:/meili_data
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:7700/health || exit 1" ]
+      interval: 4s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
 volumes:
   postgres:
   redis:
+  meilisearch:

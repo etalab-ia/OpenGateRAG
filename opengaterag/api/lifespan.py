@@ -6,9 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from opengaterag.api.infrastructure.configuration import Configuration, get_configuration
 from opengaterag.api.infrastructure.context import global_context
+from opengaterag.api.infrastructure.meilisearch import bootstrap_meilisearch_index
 
 OPENGATELLM_TIMEOUT_SECONDS = 10
 OPENGATELLM_HEALTH_TIMEOUT_SECONDS = 60
+MEILISEARCH_TIMEOUT_SECONDS = 10
+MEILISEARCH_HEALTH_TIMEOUT_SECONDS = 60
 
 
 @asynccontextmanager
@@ -17,12 +20,16 @@ async def lifespan(_: FastAPI):
 
     global_context.opengatellm_client = create_opengatellm_client(configuration)
     await check_opengatellm_health(global_context.opengatellm_client)
+    global_context.meilisearch_client = create_meilisearch_client(configuration)
+    await check_meilisearch_health(global_context.meilisearch_client)
+    await bootstrap_meilisearch_index(meilisearch_client=global_context.meilisearch_client, configuration=configuration)
     global_context.postgres_engine = create_postgres_engine(configuration)
     global_context.postgres_session_factory = create_postgres_session_factory(engine=global_context.postgres_engine)
 
     yield
 
     await global_context.opengatellm_client.aclose()
+    await global_context.meilisearch_client.aclose()
     await global_context.postgres_engine.dispose()
 
 
@@ -34,6 +41,19 @@ async def check_opengatellm_health(opengatellm_client: httpx.AsyncClient) -> Non
     response = await opengatellm_client.get(url="/health", timeout=OPENGATELLM_HEALTH_TIMEOUT_SECONDS)
     if response.status_code != 200:
         raise RuntimeError("OpenGateLLM is not reachable.")
+
+
+def create_meilisearch_client(configuration: Configuration) -> httpx.AsyncClient:
+    meilisearch = configuration.dependencies.meilisearch
+    return httpx.AsyncClient(
+        base_url=meilisearch.url, headers={"Authorization": f"Bearer {meilisearch.api_key}"}, timeout=MEILISEARCH_TIMEOUT_SECONDS
+    )
+
+
+async def check_meilisearch_health(meilisearch_client: httpx.AsyncClient) -> None:
+    response = await meilisearch_client.get(url="/health", timeout=MEILISEARCH_HEALTH_TIMEOUT_SECONDS)
+    if response.status_code != 200:
+        raise RuntimeError("Meilisearch is not reachable.")
 
 
 def create_postgres_engine(configuration: Configuration) -> AsyncEngine:

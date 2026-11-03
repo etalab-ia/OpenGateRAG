@@ -15,10 +15,22 @@ dependencies:
         statement_timeout: "120s"
       command_timeout: 60
 
+  meilisearch:
+    url: ${MEILISEARCH_URL:-http://localhost:7700}
+    api_key: ${MEILISEARCH_API_KEY:-changemechangeme}
+    index_name: ${MEILISEARCH_INDEX_NAME:-opengaterag}
+    # Called by Meilisearch, not by the API. It must be a public address: Meilisearch rejects internal IPs by default.
+    embedder_url: ${MEILISEARCH_EMBEDDER_URL:-https://albert.api.dev.etalab.gouv.fr/v1/embeddings}
+    embedder_api_key: ${MEILISEARCH_EMBEDDER_API_KEY:-}
+    # embedder_name: default
+    # index_language: fra  # detected by Meilisearch by default
+    # task_timeout: 300
+
 # ---------------------------------- settings -----------------------------------
 settings:
   # storage_default_limit: 10000000  # 10M tokens by default, set to null for unlimited
   # storage_compute_tokenizer: tiktoken_gpt2  # default tokenizer
+  # chunk_max_characters: 2048  # must fit in the context of the embedding model
   # disabled_routers: ["collections"]
   # hidden_routers: ["documents"]
   # app_title: My OpenGateRAG API
