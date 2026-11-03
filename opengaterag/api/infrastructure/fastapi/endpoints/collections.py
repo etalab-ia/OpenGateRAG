@@ -2,6 +2,7 @@ from fastapi import APIRouter, Body, Depends, Path, Query, Security
 
 from opengaterag.api.dependencies import (
     create_collection_use_case_factory,
+    delete_collection_use_case_factory,
     get_collections_use_case_factory,
     get_one_collection_use_case_factory,
     update_collection_use_case_factory,
@@ -22,6 +23,9 @@ from opengaterag.api.use_cases.collections import (
     CreateCollectionCommand,
     CreateCollectionUseCase,
     CreateCollectionUseCaseSuccess,
+    DeleteCollectionCommand,
+    DeleteCollectionUseCase,
+    DeleteCollectionUseCaseSuccess,
     GetCollectionsCommand,
     GetCollectionsUseCase,
     GetOneCollectionCommand,
@@ -107,5 +111,24 @@ async def update_collection(
     match result:
         case UpdateCollectionUseCaseSuccess(collection=collection):
             return CollectionResponse.model_validate(collection, from_attributes=True)
+        case CollectionNotFoundError():
+            raise CollectionNotFoundHTTPException()
+
+
+@router.delete(path=EndpointRoute.COLLECTION, status_code=204)
+async def delete_collection(
+    collection_id: int = Path(description="ID of the collection."),
+    user: AuthenticatedUserView = Security(AccessController()),
+    delete_collection_use_case: DeleteCollectionUseCase = Depends(delete_collection_use_case_factory),
+) -> None:
+    """
+    Delete a collection you own and its documents.
+    """
+    command = DeleteCollectionCommand(user_id=user.id, collection_id=collection_id)
+    result = await delete_collection_use_case.execute(command)
+
+    match result:
+        case DeleteCollectionUseCaseSuccess():
+            return None
         case CollectionNotFoundError():
             raise CollectionNotFoundHTTPException()
