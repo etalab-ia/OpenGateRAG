@@ -12,3 +12,7 @@ class CollectionRepository(ABC):
     @abstractmethod
     async def update_collection(self, collection_id: int, name: str, description: str | None) -> Collection | CollectionNotFoundError:
         pass
+
+    @abstractmethod
+    async def delete_collection(self, collection_id: int) -> None | CollectionNotFoundError:
+        pass
