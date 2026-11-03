@@ -23,8 +23,10 @@
 * Lauch database dependencies
 
     ```bash
-    docker compose --file compose.example.yml up --wait --detach postgres
+    docker compose --file compose.example.yml up --wait --detach postgres meilisearch
     ```
+
+    Meilisearch computes the embeddings by calling OpenGateLLM with `MEILISEARCH_EMBEDDER_API_KEY`, an OpenGateLLM service key. `MEILISEARCH_EMBEDDER_URL` is resolved from the Meilisearch container and must be a public address: Meilisearch rejects internal IPs unless `MEILI_EXPERIMENTAL_ALLOWED_IP_NETWORKS` allows them.
 
 * Instantiate database
 
@@ -55,8 +57,9 @@
 * Run integration tests (they create and drop the `opengaterag_test` database)
 
     ```bash
-    docker compose --file compose.example.yml up --wait --detach postgres
+    docker compose --file compose.example.yml up --wait --detach postgres meilisearch
     export TEST_POSTGRES_URL=postgresql+asyncpg://postgres:changeme@localhost:${POSTGRES_PORT:-5432}/opengaterag_test
+    export TEST_MEILISEARCH_URL=http://localhost:${MEILISEARCH_PORT:-7700}
     pytest opengaterag/api/tests/integration/
     ```
 
