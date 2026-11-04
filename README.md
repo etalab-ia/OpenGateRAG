@@ -5,6 +5,12 @@
 [![License](https://img.shields.io/github/license/etalab-ia/OpenGateRAG?color=green&label=license)](https://github.com/etalab-ia/OpenGateRAG/blob/main/LICENSE)
 [![Stars](https://img.shields.io/github/stars/etalab-ia/OpenGateRAG?color=yellow&label=stars)](https://github.com/etalab-ia/OpenGateRAG/stargazers)
 
+## Supported document formats
+
+OpenGateRAG ingests PDF, HTML, Markdown, TXT, DOCX, XLSX, PPTX, ODT, ODS, ODP, CSV and EPUB files. PDF and PPTX chunks retain 1-based source page or slide numbers in `metadata.page_number`; other formats leave it unset when no reliable physical pagination exists.
+
+DOCX, XLSX, PPTX, ODT, ODS, ODP, CSV and EPUB conversion runs locally through Docling without outbound resource fetching. ZIP-based documents are checked for malformed content, excessive member counts and decompressed-size limits before parsing. Existing LangChain chunking remains unchanged.
+
 ## Developer mode (local API)
 
 * Install dependencies
