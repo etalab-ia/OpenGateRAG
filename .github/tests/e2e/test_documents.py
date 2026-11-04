@@ -87,13 +87,14 @@ class TestDocuments:
         assert page_numbers.count(1) == 6
         assert page_numbers.count(2) == 3
 
-    def test_upload_text_file_has_no_page_number(self, user_client: TestClient, collection: int):
+    def test_upload_text_file_has_no_page_number(self, user_client: TestClient, collection: int, es_refresh):
         data = {"collection_id": str(collection), "metadata": json.dumps({"source_title": "plain-text"})}
         files = {"file": ("notes.txt", BytesIO(b"Plain text without physical pagination."), "text/plain")}
         response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
         assert response.status_code == 201, response.text
 
         document_id = response.json()["id"]
+        es_refresh()
         response = user_client.get(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}/chunks")
         assert response.status_code == 200, response.text
         chunks = Chunks(**response.json())
