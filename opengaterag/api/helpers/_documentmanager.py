@@ -252,6 +252,8 @@ class DocumentManager:
             chunked_pages: list[tuple[str, int | None]] = []
             for page in pages:
                 content = page["text"]
+                if not content.strip():
+                    continue
                 if disable_chunking:
                     chunks = [content]
                 else:

@@ -523,6 +523,23 @@ async def test_create_pdf_document_without_chunking_keeps_page_provenance(mock_g
     split.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_create_pdf_document_without_chunking_skips_blank_pages(mock_global_tokenizer):
+    chunks, split = await create_chunks_for_upload(
+        parsed_content=[
+            {"text": "first page", "metadata": {"page": 1}},
+            {"text": "", "metadata": {"page": 2}},
+        ],
+        metadata={"source": "report"},
+        split_results=[],
+        disable_chunking=True,
+    )
+
+    assert [chunk.content for chunk in chunks] == ["first page"]
+    assert chunks[0].metadata == {"source": "report", "page_number": 1}
+    split.assert_not_called()
+
+
 @pytest.mark.parametrize(
     ("filename", "content_type"),
     [("test.html", "text/html"), ("test.md", "text/markdown"), ("test.txt", "text/plain")],
