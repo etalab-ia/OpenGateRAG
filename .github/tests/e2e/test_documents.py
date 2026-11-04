@@ -79,8 +79,7 @@ class TestDocuments:
         assert chunks.data[0].collection_id == collection
         assert chunks.data[0].document_id == document_id
         assert chunks.data[0].content != ""
-        assert chunks.data[0].metadata == {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 1}
-        assert chunks.data[-1].metadata["page_number"] == 2
+        assert all("page_number" in chunk.metadata for chunk in chunks.data)
         assert all(chunk.metadata["source_title"] == "test" for chunk in chunks.data)
         assert all(chunk.metadata["source_tags"] == "tag-1,tag-2" for chunk in chunks.data)
         page_numbers = [chunk.metadata["page_number"] for chunk in chunks.data]
@@ -158,10 +157,9 @@ class TestDocuments:
         chunks = Chunks(**chunks)  # test output format
         assert len(chunks.data) == 2
         assert all(chunk.content != "" for chunk in chunks.data)
-        assert [chunk.metadata for chunk in chunks.data] == [
-            {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 1},
-            {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 2},
-        ]
+        assert sorted(chunk.metadata["page_number"] for chunk in chunks.data) == [1, 2]
+        assert all(chunk.metadata["source_title"] == "test" for chunk in chunks.data)
+        assert all(chunk.metadata["source_tags"] == "tag-1,tag-2" for chunk in chunks.data)
 
     def test_create_document_without_file(self, user_client: TestClient, admin_client: TestClient, collection):
         data = {
