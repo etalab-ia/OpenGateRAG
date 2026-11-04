@@ -1,3 +1,4 @@
+from io import BytesIO
 import json
 from pathlib import Path
 from time import sleep
@@ -82,6 +83,23 @@ class TestDocuments:
         assert chunks.data[-1].metadata["page_number"] == 2
         assert all(chunk.metadata["source_title"] == "test" for chunk in chunks.data)
         assert all(chunk.metadata["source_tags"] == "tag-1,tag-2" for chunk in chunks.data)
+        page_numbers = [chunk.metadata["page_number"] for chunk in chunks.data]
+        assert page_numbers.count(1) == 6
+        assert page_numbers.count(2) == 3
+
+    def test_upload_text_file_has_no_page_number(self, user_client: TestClient, collection: int):
+        data = {"collection_id": str(collection), "metadata": json.dumps({"source_title": "plain-text"})}
+        files = {"file": ("notes.txt", BytesIO(b"Plain text without physical pagination."), "text/plain")}
+        response = user_client.post(url=f"/v1{EndpointRoute.DOCUMENTS}", data=data, files=files)
+        assert response.status_code == 201, response.text
+
+        document_id = response.json()["id"]
+        response = user_client.get(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}/chunks")
+        assert response.status_code == 200, response.text
+        chunks = Chunks(**response.json())
+        assert len(chunks.data) == 1
+        assert chunks.data[0].content != ""
+        assert chunks.data[0].metadata == {"source_title": "plain-text"}
 
     def test_upload_file_with_overwrite_name(self, user_client: TestClient, admin_client: TestClient, collection):
         data = {  # with metadata
