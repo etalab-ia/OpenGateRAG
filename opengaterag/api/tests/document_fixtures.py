@@ -84,7 +84,7 @@ def build_csv(_: Path) -> bytes:
     return b"name,value\nCSV milestone,42\n"
 
 
-def build_epub(path: Path) -> bytes:
+def build_epub(path: Path, invalid_chapter: bool = False, missing_chapter: bool = False) -> bytes:
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as epub:
         epub.writestr("mimetype", EPUB_MIME, compress_type=zipfile.ZIP_STORED)
         epub.writestr(
@@ -103,16 +103,30 @@ def build_epub(path: Path) -> bytes:
     <dc:title>EPUB fixture</dc:title>
     <dc:language>en</dc:language>
   </metadata>
-  <manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest>
-  <spine><itemref idref="chapter"/></spine>
+  <manifest>
+    <item id="one" href="one.xhtml" media-type="application/xhtml+xml"/>
+    <item id="two" href="two.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="one"/><itemref idref="two"/></spine>
 </package>""",
         )
         epub.writestr(
-            "OEBPS/chapter.xhtml",
+            "OEBPS/one.xhtml",
             """<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
-  <head><title>EPUB fixture</title></head>
+  <head><title>First chapter</title></head>
   <body><h1>EPUB chapter marker</h1><p>A paragraph from the EPUB fixture.</p></body>
 </html>""",
         )
+        if invalid_chapter:
+            epub.writestr("OEBPS/two.xhtml", b"\xffinvalid utf-8")
+        elif not missing_chapter:
+            epub.writestr(
+                "OEBPS/two.xhtml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head><title>Second chapter</title></head>
+  <body><h1>EPUB second chapter</h1><p>Content that must not be dropped.</p></body>
+</html>""",
+            )
     return path.read_bytes()

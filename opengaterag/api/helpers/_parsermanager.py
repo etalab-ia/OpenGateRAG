@@ -1,11 +1,15 @@
 import asyncio
+import codecs
 from dataclasses import dataclass
 from enum import StrEnum
 from io import BytesIO
 import logging
 from pathlib import Path
+import posixpath
+from urllib.parse import unquote
 import zipfile
 
+import defusedxml.ElementTree as DefusedElementTree
 from docling.datamodel.backend_options import (
     CsvBackendOptions,
     DeclarativeBackendOptions,
@@ -189,6 +193,8 @@ class ParserManager:
                 async with self.conversion_semaphore:
                     file_content = await file.read()
                     filename = Path(file.filename or f"document.{file_type.value}").name
+                    if Path(filename).suffix.lower() not in self.EXTENSION_MAP:
+                        filename = f"{filename}.{file_type.value}"
                     content = await asyncio.to_thread(self._parse_with_docling, file_content, filename, file_type)
 
         return content
@@ -196,6 +202,8 @@ class ParserManager:
     def _parse_with_docling(self, content: bytes, filename: str, file_type: FileType) -> str | list[dict]:
         if file_type in self.ARCHIVE_FILE_TYPES:
             self._check_archive_limits(content)
+        if file_type == FileType.EPUB:
+            self._validate_epub_content(content)
 
         input_format = self.DOCLING_FORMATS[file_type]
         no_fetch = {"enable_local_fetch": False, "enable_remote_fetch": False}
@@ -247,6 +255,51 @@ class ParserManager:
 
         return result.document.export_to_markdown().strip()
 
+    @staticmethod
+    def _validate_epub_content(content: bytes) -> None:
+        with zipfile.ZipFile(BytesIO(content)) as archive:
+            try:
+                container_root = DefusedElementTree.fromstring(archive.read("META-INF/container.xml"))
+                container_ns = {"container": "urn:oasis:names:tc:opendocument:xmlns:container"}
+                rootfile = container_root.find(".//container:rootfile", container_ns)
+                opf_path = rootfile.get("full-path") if rootfile is not None else None
+                if not opf_path:
+                    raise ValueError("Missing EPUB package document")
+
+                opf_root = DefusedElementTree.fromstring(archive.read(opf_path))
+                opf_ns = {"opf": "http://www.idpf.org/2007/opf"}
+                manifest = opf_root.find(".//opf:manifest", opf_ns)
+                spine = opf_root.find(".//opf:spine", opf_ns)
+                if manifest is None or spine is None:
+                    raise ValueError("Missing EPUB manifest or spine")
+
+                manifest_map = {
+                    item.get("id"): unquote(item.get("href", ""))
+                    for item in manifest.findall("opf:item", opf_ns)
+                    if item.get("id") and item.get("href")
+                }
+                opf_dir = posixpath.dirname(opf_path)
+                content_files = []
+                for itemref in spine.findall("opf:itemref", opf_ns):
+                    idref = itemref.get("idref")
+                    if not idref or idref not in manifest_map:
+                        raise ValueError("EPUB spine references an unknown manifest item")
+                    content_files.append(posixpath.normpath(posixpath.join(opf_dir, manifest_map[idref])))
+                if not content_files:
+                    raise ValueError("EPUB spine has no content documents")
+            except Exception as e:
+                raise ValueError("Invalid EPUB package structure") from e
+
+            for content_file in content_files:
+                try:
+                    data = archive.read(content_file)
+                    if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+                        data.decode("utf-16")
+                    else:
+                        data.decode("utf-8")
+                except Exception as e:
+                    raise ValueError(f"Invalid EPUB content document: {content_file}") from e
+
     def _check_archive_limits(self, content: bytes) -> None:
         limits = self.archive_limits
         try:
@@ -291,8 +344,11 @@ class ParserManager:
             if content_type in self.VALID_CONTENT_TYPES[file_type]:
                 detected_type = file_type
         else:
-            # detect type only by content-type (less robust because it stops after first match)
+            # detect type by content-type when the extension is not recognized
             for file_type, valid_content_types in self.VALID_CONTENT_TYPES.items():
+                # Keep the legacy text/plain fallback to TXT; CSV still works by extension or text/csv.
+                if file_type == FileType.CSV and content_type == "text/plain":
+                    continue
                 if content_type in valid_content_types and content_type != "application/octet-stream":
                     detected_type = file_type
 

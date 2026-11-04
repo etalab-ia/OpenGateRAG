@@ -104,3 +104,32 @@ async def test_archive_limits_are_enforced(limits, expected, tmp_path):
 
     with pytest.raises(ValueError, match=expected):
         await ParserManager(archive_limits=limits).parse(make_upload(path.read_bytes(), path.name, ODT_MIME))
+
+
+@pytest.mark.parametrize("filename", ["README", "notes.data"])
+@pytest.mark.asyncio
+async def test_plain_text_without_a_recognized_extension_remains_txt(filename):
+    content = b"plain text without delimiters\nsecond line\n"
+
+    parsed = await ParserManager().parse(make_upload(content, filename, "text/plain"))
+
+    assert parsed == "plain text without delimiters\nsecond line"
+
+
+@pytest.mark.asyncio
+async def test_single_column_csv_without_an_extension_is_accepted():
+    parsed = await ParserManager().parse(make_upload(b"column\nvalue\n", "README", "text/csv"))
+
+    assert "column" in parsed
+    assert "value" in parsed
+
+
+@pytest.mark.asyncio
+async def test_epub_requires_every_spine_document_to_be_readable(tmp_path):
+    valid = await ParserManager().parse(make_upload(build_epub(tmp_path / "valid.epub"), "valid.epub", EPUB_MIME))
+    assert "EPUB chapter marker" in valid
+    assert "EPUB second chapter" in valid
+
+    for filename, options in (("invalid.epub", {"invalid_chapter": True}), ("missing.epub", {"missing_chapter": True})):
+        with pytest.raises(ValueError, match="Invalid EPUB content document"):
+            await ParserManager().parse(make_upload(build_epub(tmp_path / filename, **options), filename, EPUB_MIME))

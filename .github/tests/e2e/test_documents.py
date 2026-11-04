@@ -148,6 +148,40 @@ class TestDocuments:
             response = user_client.delete(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}")
             assert response.status_code == 204, response.text
 
+    def test_upload_pptx_with_langchain_chunking(self, user_client: TestClient, collection: int, es_refresh, tmp_path: Path):
+        content = build_pptx(tmp_path / "chunked.pptx")
+        data = {
+            "collection_id": str(collection),
+            "chunk_size": "20",
+            "chunk_overlap": "0",
+            "chunk_min_size": "0",
+            "metadata": json.dumps({"source_title": "docling-chunking-fixture"}),
+        }
+        response = user_client.post(
+            url=f"/v1{EndpointRoute.DOCUMENTS}",
+            data=data,
+            files={"file": ("chunked.pptx", content, PPTX_MIME)},
+        )
+        assert response.status_code == 201, response.text
+        document_id = response.json()["id"]
+
+        try:
+            es_refresh()
+            response = user_client.get(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}/chunks", params={"limit": 100})
+            assert response.status_code == 200, response.text
+            chunks = Chunks(**response.json())
+
+            page_numbers = [chunk.metadata["page_number"] for chunk in chunks.data]
+            assert set(page_numbers) == {1, 2}
+            assert any(page_numbers.count(page_number) > 1 for page_number in (1, 2))
+            assert all(chunk.metadata["source_title"] == "docling-chunking-fixture" for chunk in chunks.data)
+            combined_text = "\n".join(chunk.content for chunk in chunks.data)
+            assert "First slide marker" in combined_text
+            assert "Second slide marker" in combined_text
+        finally:
+            response = user_client.delete(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}")
+            assert response.status_code == 204, response.text
+
     def test_upload_file_with_overwrite_name(self, user_client: TestClient, admin_client: TestClient, collection):
         data = {  # with metadata
             "collection_id": str(collection),
