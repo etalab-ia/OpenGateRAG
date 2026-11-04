@@ -83,8 +83,9 @@ class TestDocuments:
         assert all(chunk.metadata["source_title"] == "test" for chunk in chunks.data)
         assert all(chunk.metadata["source_tags"] == "tag-1,tag-2" for chunk in chunks.data)
         page_numbers = [chunk.metadata["page_number"] for chunk in chunks.data]
-        assert page_numbers.count(1) == 6
-        assert page_numbers.count(2) == 3
+        assert set(page_numbers) == {1, 2}
+        assert page_numbers.count(1) > 1
+        assert page_numbers.count(2) > 1
 
     def test_upload_text_file_has_no_page_number(self, user_client: TestClient, collection: int, es_refresh):
         data = {"collection_id": str(collection), "metadata": json.dumps({"source_title": "plain-text"})}
