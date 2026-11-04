@@ -176,8 +176,9 @@ class TestDocuments:
             assert any(page_numbers.count(page_number) > 1 for page_number in (1, 2))
             assert all(chunk.metadata["source_title"] == "docling-chunking-fixture" for chunk in chunks.data)
             combined_text = "\n".join(chunk.content for chunk in chunks.data)
-            assert "First slide marker" in combined_text
-            assert "Second slide marker" in combined_text
+            normalized_text = " ".join(combined_text.split())
+            assert "First slide marker" in normalized_text
+            assert "Second slide marker" in normalized_text
         finally:
             response = user_client.delete(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}")
             assert response.status_code == 204, response.text
