@@ -27,6 +27,7 @@ dependencies = [
     "python-multipart==0.0.31",
     "asyncpg==0.31.0",
     "tiktoken==0.12.0",
+    "docling-slim[format-office,format-opendocument,format-html]==2.144.0",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +36,9 @@ test = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
 ]
+
+[tool.uv]
+exclude-newer = "1 week"
 
 [build-system]
 requires = ["setuptools>=70", "wheel"]

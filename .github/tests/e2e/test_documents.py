@@ -9,6 +9,23 @@ import pytest
 from opengaterag.api.schemas.chunks import Chunks
 from opengaterag.api.schemas.collections import CollectionVisibility
 from opengaterag.api.schemas.documents import Document, Documents
+from opengaterag.api.tests.document_fixtures import (
+    DOCX_MIME,
+    EPUB_MIME,
+    ODP_MIME,
+    ODS_MIME,
+    ODT_MIME,
+    PPTX_MIME,
+    XLSX_MIME,
+    build_csv,
+    build_docx,
+    build_epub,
+    build_odp,
+    build_ods,
+    build_odt,
+    build_pptx,
+    build_xlsx,
+)
 from opengaterag.api.utils.variables import EndpointRoute
 
 PDF_ASSET = Path(__file__).parent / "assets" / "pdf.pdf"
@@ -82,6 +99,89 @@ class TestDocuments:
         assert chunks.data[-1].metadata["page_number"] == 2
         assert all(chunk.metadata["source_title"] == "test" for chunk in chunks.data)
         assert all(chunk.metadata["source_tags"] == "tag-1,tag-2" for chunk in chunks.data)
+
+    @pytest.mark.parametrize(
+        ("filename", "content_type", "builder", "expected", "expected_pages"),
+        [
+            pytest.param("sample.docx", DOCX_MIME, build_docx, "DOCX milestone", set(), id="docx"),
+            pytest.param("sample.xlsx", XLSX_MIME, build_xlsx, "XLSX milestone", set(), id="xlsx"),
+            pytest.param("sample.pptx", PPTX_MIME, build_pptx, "First slide marker", {1, 2}, id="pptx"),
+            pytest.param("sample.odt", ODT_MIME, build_odt, "ODT milestone", set(), id="odt"),
+            pytest.param("sample.ods", ODS_MIME, build_ods, "ODS milestone", set(), id="ods"),
+            pytest.param("sample.odp", ODP_MIME, build_odp, "ODP slide marker", set(), id="odp"),
+            pytest.param("sample.csv", "text/csv", build_csv, "CSV milestone", set(), id="csv"),
+            pytest.param("sample.epub", EPUB_MIME, build_epub, "EPUB chapter marker", set(), id="epub"),
+        ],
+    )
+    def test_upload_docling_formats(
+        self, user_client: TestClient, collection: int, es_refresh, tmp_path: Path, filename, content_type, builder, expected, expected_pages
+    ):
+        content = builder(tmp_path / filename)
+        data = {
+            "collection_id": str(collection),
+            "disable_chunking": "true",
+            "chunk_min_size": "0",
+            "metadata": json.dumps({"source_title": "docling-fixture"}),
+        }
+        response = user_client.post(
+            url=f"/v1{EndpointRoute.DOCUMENTS}",
+            data=data,
+            files={"file": (filename, content, content_type)},
+        )
+        assert response.status_code == 201, response.text
+        document_id = response.json()["id"]
+
+        try:
+            es_refresh()
+            response = user_client.get(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}/chunks", params={"limit": 100})
+            assert response.status_code == 200, response.text
+            chunks = Chunks(**response.json())
+
+            assert expected in "\n".join(chunk.content for chunk in chunks.data)
+            assert all(chunk.metadata["source_title"] == "docling-fixture" for chunk in chunks.data)
+            if expected_pages:
+                assert {chunk.metadata["page_number"] for chunk in chunks.data} == expected_pages
+                assert len(chunks.data) == len(expected_pages)
+            else:
+                assert all("page_number" not in chunk.metadata for chunk in chunks.data)
+        finally:
+            response = user_client.delete(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}")
+            assert response.status_code == 204, response.text
+
+    def test_upload_pptx_with_langchain_chunking(self, user_client: TestClient, collection: int, es_refresh, tmp_path: Path):
+        content = build_pptx(tmp_path / "chunked.pptx")
+        data = {
+            "collection_id": str(collection),
+            "chunk_size": "20",
+            "chunk_overlap": "0",
+            "chunk_min_size": "0",
+            "metadata": json.dumps({"source_title": "docling-chunking-fixture"}),
+        }
+        response = user_client.post(
+            url=f"/v1{EndpointRoute.DOCUMENTS}",
+            data=data,
+            files={"file": ("chunked.pptx", content, PPTX_MIME)},
+        )
+        assert response.status_code == 201, response.text
+        document_id = response.json()["id"]
+
+        try:
+            es_refresh()
+            response = user_client.get(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}/chunks", params={"limit": 100})
+            assert response.status_code == 200, response.text
+            chunks = Chunks(**response.json())
+
+            page_numbers = [chunk.metadata["page_number"] for chunk in chunks.data]
+            assert set(page_numbers) == {1, 2}
+            assert any(page_numbers.count(page_number) > 1 for page_number in (1, 2))
+            assert all(chunk.metadata["source_title"] == "docling-chunking-fixture" for chunk in chunks.data)
+            combined_text = "\n".join(chunk.content for chunk in chunks.data)
+            normalized_text = " ".join(combined_text.split())
+            assert "First slide marker" in normalized_text
+            assert "Second slide marker" in normalized_text
+        finally:
+            response = user_client.delete(url=f"/v1{EndpointRoute.DOCUMENTS}/{document_id}")
+            assert response.status_code == 204, response.text
 
     def test_upload_file_with_overwrite_name(self, user_client: TestClient, admin_client: TestClient, collection):
         data = {  # with metadata
