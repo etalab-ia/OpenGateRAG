@@ -10,12 +10,15 @@ MIN_NUMBER, MAX_NUMBER = -9999999999999999, 9999999999999999
 MetadataStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
 MetadataInt = Annotated[int, Field(ge=MIN_NUMBER, le=MAX_NUMBER)]
 MetadataFloat = Annotated[float, Field(ge=MIN_NUMBER, le=MAX_NUMBER)]
-ChunkMetadata = Annotated[dict[MetadataStr, MetadataStr | MetadataInt | MetadataFloat | bool], Field(description="Extra metadata for the source", min_length=1, max_length=10)]  # fmt: off
+Metadata = dict[MetadataStr, MetadataStr | MetadataInt | MetadataFloat | bool]
+InputChunkMetadata = Annotated[Metadata, Field(description="Extra metadata for the source", min_length=1, max_length=10)]  # fmt: off
+# A derived chunk can carry page_number in addition to the ten user-supplied keys.
+ChunkMetadata = Annotated[Metadata, Field(description="Extra metadata for the source", min_length=1, max_length=11)]  # fmt: off
 
 
 class InputChunk(BaseModel):
     content: Annotated[str, Field(default=..., description="The content of the chunk.")]
-    metadata: Annotated[ChunkMetadata | None, Field(default=None, description="Metadata of the chunk")]
+    metadata: Annotated[InputChunkMetadata | None, Field(default=None, description="Metadata of the chunk")]
 
 
 class CreateChunks(BaseModel):

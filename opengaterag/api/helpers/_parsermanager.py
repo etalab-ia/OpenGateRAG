@@ -60,7 +60,7 @@ class ParserManager:
     def __init__(self, max_concurrent: int = 10):
         self.conversion_semaphore = asyncio.Semaphore(value=max_concurrent)
 
-    async def parse(self, file: UploadFile) -> str:
+    async def parse(self, file: UploadFile, pages: list[int] | None = None) -> str | list[dict]:
         file_type = self.check_file_type(file=file)
         content = None
 
@@ -69,7 +69,7 @@ class ParserManager:
                 async with self.conversion_semaphore:
                     file_content = await file.read()
                     with pymupdf.open(stream=file_content, filetype="pdf") as doc:
-                        content = await asyncio.to_thread(pymupdf4llm.to_markdown, doc)
+                        content = await asyncio.to_thread(pymupdf4llm.to_markdown, doc, pages=pages, page_chunks=True)
 
             case FileType.HTML:
                 file_content = await self._read_content(file=file)

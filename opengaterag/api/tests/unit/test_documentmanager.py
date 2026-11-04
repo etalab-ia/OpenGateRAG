@@ -3,12 +3,14 @@ from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
 
 from fastapi import UploadFile
+import pymupdf
 import pytest
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import Headers
 
 from opengaterag.api.helpers._documentmanager import DocumentManager
+from opengaterag.api.helpers._parsermanager import ParserManager
 from opengaterag.api.schemas.chunks import Chunk
 from opengaterag.api.schemas.collections import CollectionVisibility
 from opengaterag.api.schemas.search import SearchMethod
@@ -61,6 +63,55 @@ def mock_global_tokenizer():
 def create_upload_file(content: str, filename: str, content_type: str) -> UploadFile:
     """Helper function to create UploadFile from string content."""
     return UploadFile(filename=filename, file=BytesIO(content.encode("utf-8")), headers=Headers({"content-type": content_type}))
+
+
+async def create_chunks_for_upload(
+    parsed_content: str | list[dict],
+    metadata: dict | None,
+    split_results: list[list[str]],
+    filename: str = "test.pdf",
+    content_type: str = "application/pdf",
+    disable_chunking: bool = False,
+) -> tuple[list[Chunk], MagicMock]:
+    """Create chunks through DocumentManager and capture them before indexing."""
+    mock_elasticsearch_vector_store = AsyncMock()
+    mock_parser = AsyncMock()
+    mock_parser.parse = AsyncMock(return_value=parsed_content)
+    mock_session = AsyncMock(spec=AsyncSession)
+    mock_session.execute = AsyncMock()
+    mock_session.commit = AsyncMock()
+
+    check_collection = MagicMock()
+    check_collection.scalar_one.return_value = MagicMock()
+    insert_document = MagicMock()
+    insert_document.scalar_one.return_value = 555
+    mock_session.execute.side_effect = [check_collection, insert_document]
+
+    document_manager = make_document_manager(mock_parser)
+    document_manager._get_storage_limit_and_consumption = AsyncMock(return_value=(None, 0))
+    document_manager._split = MagicMock(side_effect=split_results)
+    document_manager._upsert_document_chunks = AsyncMock()
+
+    await document_manager.create_document(
+        postgres_session=mock_session,
+        request_context=make_request_context(),
+        elasticsearch_vector_store=mock_elasticsearch_vector_store,
+        elasticsearch_client=AsyncMock(),
+        collection_id=123,
+        file=create_upload_file("upload", filename, content_type),
+        metadata=metadata,
+        chunk_size=100,
+        chunk_overlap=10,
+        chunk_min_size=1,
+        name=None,
+        disable_chunking=disable_chunking,
+        separators=["\n\n", "\n", " "],
+        preset_separators="markdown",
+        is_separator_regex=False,
+    )
+
+    chunks = document_manager._upsert_document_chunks.await_args.kwargs["chunks"]
+    return chunks, document_manager._split
 
 
 @pytest.mark.asyncio
@@ -400,6 +451,113 @@ async def test_create_document_success(mock_global_tokenizer):
 
 
 @pytest.mark.asyncio
+async def test_pdf_parser_page_selection_preserves_original_page_numbers():
+    with pymupdf.open() as document:
+        for page_index in range(3):
+            document.new_page()
+            document[page_index].insert_text((72, 72), f"Page {page_index + 1} content")
+        pdf_content = document.tobytes()
+
+    file = UploadFile(filename="selected.pdf", file=BytesIO(pdf_content), headers=Headers({"content-type": "application/pdf"}))
+    pages = await ParserManager().parse(file=file, pages=[1, 2])
+
+    assert [page["metadata"]["page"] for page in pages] == [2, 3]
+    assert "Page 2 content" in pages[0]["text"]
+    assert "Page 3 content" in pages[1]["text"]
+
+
+@pytest.mark.asyncio
+async def test_create_pdf_document_preserves_page_provenance_and_user_metadata(mock_global_tokenizer):
+    pages = [
+        {"text": "first page", "metadata": {"page": 1, "format": "PDF 1.7", "page_count": 4}},
+        {"text": "fourth page", "metadata": {"page": 4, "format": "PDF 1.7", "page_count": 4}},
+    ]
+    user_metadata = {f"key{index}": f"value{index}" for index in range(10)}
+
+    chunks, split = await create_chunks_for_upload(
+        parsed_content=pages,
+        metadata=user_metadata,
+        split_results=[["first chunk", "second chunk"], ["fourth page chunk"]],
+    )
+
+    assert [chunk.content for chunk in chunks] == ["first chunk", "second chunk", "fourth page chunk"]
+    assert [chunk.metadata["page_number"] for chunk in chunks] == [1, 1, 4]
+    for chunk in chunks:
+        assert chunk.metadata == {**user_metadata, "page_number": chunk.metadata["page_number"]}
+        assert "format" not in chunk.metadata
+        assert "page_count" not in chunk.metadata
+    assert user_metadata == {f"key{index}": f"value{index}" for index in range(10)}
+    assert split.call_count == 2
+    assert split.call_args_list[0].kwargs["content"] == "first page"
+    assert split.call_args_list[1].kwargs["content"] == "fourth page"
+
+
+@pytest.mark.asyncio
+async def test_create_pdf_document_page_number_takes_precedence_over_user_metadata(mock_global_tokenizer):
+    chunks, _ = await create_chunks_for_upload(
+        parsed_content=[{"text": "second page", "metadata": {"page": 2}}],
+        metadata={"source": "report", "page_number": 999},
+        split_results=[["second page chunk"]],
+    )
+
+    assert chunks[0].metadata == {"source": "report", "page_number": 2}
+
+
+@pytest.mark.asyncio
+async def test_create_pdf_document_without_chunking_keeps_page_provenance(mock_global_tokenizer):
+    chunks, split = await create_chunks_for_upload(
+        parsed_content=[
+            {"text": "first page", "metadata": {"page": 1}},
+            {"text": "second page", "metadata": {"page": 2}},
+        ],
+        metadata={"source": "report"},
+        split_results=[],
+        disable_chunking=True,
+    )
+
+    assert [chunk.content for chunk in chunks] == ["first page", "second page"]
+    assert [chunk.metadata for chunk in chunks] == [
+        {"source": "report", "page_number": 1},
+        {"source": "report", "page_number": 2},
+    ]
+    split.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_create_pdf_document_without_chunking_skips_blank_pages(mock_global_tokenizer):
+    chunks, split = await create_chunks_for_upload(
+        parsed_content=[
+            {"text": "first page", "metadata": {"page": 1}},
+            {"text": "", "metadata": {"page": 2}},
+        ],
+        metadata={"source": "report"},
+        split_results=[],
+        disable_chunking=True,
+    )
+
+    assert [chunk.content for chunk in chunks] == ["first page"]
+    assert chunks[0].metadata == {"source": "report", "page_number": 1}
+    split.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("filename", "content_type"),
+    [("test.html", "text/html"), ("test.md", "text/markdown"), ("test.txt", "text/plain")],
+)
+@pytest.mark.asyncio
+async def test_non_pdf_documents_do_not_gain_page_number(mock_global_tokenizer, filename, content_type):
+    chunks, _ = await create_chunks_for_upload(
+        parsed_content="plain text",
+        metadata={"source": "plain", "page_number": 999},
+        split_results=[["plain text"]],
+        filename=filename,
+        content_type=content_type,
+    )
+
+    assert chunks[0].metadata == {"source": "plain"}
+
+
+@pytest.mark.asyncio
 async def test_get_documents_populates_chunk_count():
     mock_vector_store = AsyncMock()
     mock_elasticsearch_vector_store = AsyncMock()
@@ -649,6 +807,9 @@ async def test_get_chunks_success():
     assert len(chunks) == 2
     assert chunks[0].id == 1
     assert chunks[1].id == 2
+    assert chunks[0].metadata == {"my_tags": "tag1"}
+    assert chunks[1].metadata == {"my_tags": "tag2"}
+    assert all("page_number" not in chunk.metadata for chunk in chunks)
     mock_elasticsearch_vector_store.get_chunks.assert_awaited_once_with(
         client=mock_elasticsearch_client, document_id=456, offset=0, limit=10, chunk_id=None
     )

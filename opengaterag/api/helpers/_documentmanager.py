@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from opengaterag.api.schemas.chunks import Chunk, ChunkMetadata, InputChunk
+from opengaterag.api.schemas.chunks import Chunk, InputChunk, InputChunkMetadata
 from opengaterag.api.schemas.collections import Collection, CollectionVisibility
 from opengaterag.api.schemas.documents import Document, PresetSeparators
 from opengaterag.api.schemas.search import ComparisonFilter, CompoundFilter, Search, SearchMethod
@@ -204,7 +204,7 @@ class DocumentManager:
         chunk_overlap: int,
         chunk_min_size: int,
         disable_chunking: bool,
-        metadata: ChunkMetadata,
+        metadata: InputChunkMetadata | None,
         is_separator_regex: bool,
         separators: list[str],
         preset_separators: PresetSeparators,
@@ -229,10 +229,11 @@ class DocumentManager:
         document_token_count = 0
 
         if file:
-            # parse the file
+            # parse the file, keeping PDF pages separate so their provenance survives chunking
             try:
-                content = await self.parser_manager.parse(file=file)
-                document_token_count = len(global_context.tokenizer.encode(content))
+                parsed_content = await self.parser_manager.parse(file=file)
+                pages = [{"text": parsed_content, "metadata": {}}] if isinstance(parsed_content, str) else parsed_content
+                document_token_count = sum(len(global_context.tokenizer.encode(page["text"])) for page in pages)
             except Exception as e:
                 logger.exception(f"failed to parse {document_name} ({e}).")
                 raise ParsingDocumentFailedException()
@@ -247,21 +248,29 @@ class DocumentManager:
                     detail=f"Upload size limit exceeded. Limit: {storage_limit} tokens. Current: {storage_consumption} tokens."
                 )
 
-            # split the content into chunks
-            if disable_chunking:
-                chunks: list[str] = [content]
-            else:
-                chunks: list[str] = self._split(
-                    content=content,
-                    chunk_size=chunk_size,
-                    chunk_overlap=chunk_overlap,
-                    is_separator_regex=is_separator_regex,
-                    separators=separators,
-                    chunk_min_size=chunk_min_size,
-                    preset_separators=preset_separators,
-                )
-                if len(chunks) == 0:
-                    raise ChunkingFailedException(detail="No chunks were extracted from the document.")
+            # split each page with the existing policy and carry its original 1-based page number
+            chunked_pages: list[tuple[str, int | None]] = []
+            for page in pages:
+                content = page["text"]
+                if not content.strip():
+                    continue
+                if disable_chunking:
+                    chunks = [content]
+                else:
+                    chunks = self._split(
+                        content=content,
+                        chunk_size=chunk_size,
+                        chunk_overlap=chunk_overlap,
+                        is_separator_regex=is_separator_regex,
+                        separators=separators,
+                        chunk_min_size=chunk_min_size,
+                        preset_separators=preset_separators,
+                    )
+                page_number = page["metadata"].get("page")
+                chunked_pages.extend((chunk, page_number) for chunk in chunks)
+
+            if len(chunked_pages) == 0:
+                raise ChunkingFailedException(detail="No chunks were extracted from the document.")
 
         # insert the document into the database
         try:
@@ -282,17 +291,22 @@ class DocumentManager:
         await postgres_session.commit()
 
         if file:
-            # index the chunks into the vector store
-            chunks: list[Chunk] = [
-                Chunk(
-                    id=i,
-                    collection_id=collection_id,
-                    document_id=document_id,
-                    content=content,
-                    metadata=metadata,
+            # index the chunks into the vector store; page_number is reserved for parser-derived provenance
+            user_metadata = {key: value for key, value in (metadata or {}).items() if key != "page_number"}
+            chunks: list[Chunk] = []
+            for i, (content, page_number) in enumerate(chunked_pages):
+                chunk_metadata = dict(user_metadata)
+                if page_number is not None:
+                    chunk_metadata["page_number"] = page_number
+                chunks.append(
+                    Chunk(
+                        id=i,
+                        collection_id=collection_id,
+                        document_id=document_id,
+                        content=content,
+                        metadata=chunk_metadata or None,
+                    )
                 )
-                for i, content in enumerate(chunks)
-            ]
 
             try:
                 await self._upsert_document_chunks(
