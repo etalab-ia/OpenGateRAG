@@ -104,6 +104,7 @@ class TestDocuments:
             "parser_version": version("pymupdf4llm"),
         }
         assert chunks.data[-1].metadata["page_number"] == 2
+        assert chunks.data[-1].metadata["heading"] == "TEXTES GÉNÉRAUX"
         assert all(chunk.metadata["source_title"] == "test" for chunk in chunks.data)
         assert all(chunk.metadata["source_tags"] == "tag-1,tag-2" for chunk in chunks.data)
 
@@ -269,7 +270,7 @@ class TestDocuments:
         pdf_provenance = {"parser_name": "pymupdf4llm", "parser_version": version("pymupdf4llm")}
         assert [chunk.metadata for chunk in chunks.data] == [
             {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 1, **pdf_provenance},
-            {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 2, **pdf_provenance},
+            {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 2, "heading": "TEXTES GÉNÉRAUX", **pdf_provenance},
         ]
 
     def test_create_document_without_file(self, user_client: TestClient, admin_client: TestClient, collection):

@@ -201,14 +201,17 @@ class ParserManager:
                             raise ValueError("Document exceeds the page limit")
                         parsed_pages = await asyncio.to_thread(pymupdf4llm.to_markdown, doc, pages=pages, page_chunks=True)
                 parser_metadata = self._parser_provenance("pymupdf4llm")
-                content = [
-                    section
-                    for page in parsed_pages
-                    for section in self._markdown_sections(
+                content = []
+                active_heading = None
+                for page in parsed_pages:
+                    sections = self._markdown_sections(
                         page["text"],
                         {**parser_metadata, "page": page.get("metadata", {}).get("page")},
+                        initial_heading=active_heading,
                     )
-                ]
+                    content.extend(sections)
+                    if sections:
+                        active_heading = sections[-1]["metadata"].get("heading", active_heading)
 
             case FileType.HTML:
                 file_content = await self._read_content(file=file)
@@ -257,12 +260,18 @@ class ParserManager:
         return headings
 
     @classmethod
-    def _markdown_sections(cls, text: str, metadata: dict | None = None, allowed_headings: set[str] | None = None) -> list[dict]:
+    def _markdown_sections(
+        cls,
+        text: str,
+        metadata: dict | None = None,
+        allowed_headings: set[str] | None = None,
+        initial_heading: str | None = None,
+    ) -> list[dict]:
         """Split only at source headings; LangChain remains the chunker downstream."""
         base_metadata = {key: value for key, value in (metadata or {}).items() if value is not None}
         sections = []
         current_lines = []
-        current_heading = None
+        current_heading = initial_heading
         fence_character = None
         fence_length = 0
 

@@ -57,28 +57,33 @@ def _parser_chunk_metadata(metadata: dict) -> dict:
     return provenance
 
 
-def _coalesce_parser_sections(sections: list[dict]) -> list[dict]:
-    """Restore page/document chunks when chunking is disabled, even across heading sections."""
-    grouped_sections = []
-    grouped_headings = []
+def _coalesce_parser_sections(sections: list[dict], min_text_length: int | None = None) -> list[dict]:
+    """Coalesce each page, or only consecutive groups still below the minimum chunk size."""
+    groups = []
     for section in sections:
         metadata = section.get("metadata", {})
         metadata = metadata if isinstance(metadata, dict) else {}
         page_number = metadata.get("page")
-        if not grouped_sections or grouped_sections[-1][0] != page_number:
-            grouped_sections.append((page_number, {"text": [], "metadata": {key: value for key, value in metadata.items() if key != "heading"}}))
-            grouped_headings.append([])
-        grouped_sections[-1][1]["text"].append(section["text"])
-        heading = metadata.get("heading")
-        if isinstance(heading, str) and heading and heading not in grouped_headings[-1]:
-            grouped_headings[-1].append(heading)
+        if not groups or groups[-1]["page"] != page_number or (min_text_length is not None and groups[-1]["text_length"] >= min_text_length):
+            groups.append({"page": page_number, "sections": [], "text_length": 0})
+        group = groups[-1]
+        group["text_length"] += len(section["text"]) + (2 if group["sections"] else 0)
+        group["sections"].append(section)
 
     coalesced = []
-    for (_, section), headings in zip(grouped_sections, grouped_headings, strict=True):
-        section["text"] = "\n\n".join(section["text"])
+    for group in groups:
+        first_metadata = group["sections"][0].get("metadata", {})
+        metadata = first_metadata if isinstance(first_metadata, dict) else {}
+        section_metadata = {key: value for key, value in metadata.items() if key != "heading"}
+        headings = []
+        for section in group["sections"]:
+            metadata = section.get("metadata", {})
+            heading = metadata.get("heading") if isinstance(metadata, dict) else None
+            if isinstance(heading, str) and heading and heading not in headings:
+                headings.append(heading)
         if len(headings) == 1:
-            section["metadata"]["heading"] = headings[0]
-        coalesced.append(section)
+            section_metadata["heading"] = headings[0]
+        coalesced.append({"text": "\n\n".join(section["text"] for section in group["sections"]), "metadata": section_metadata})
     return coalesced
 
 
@@ -294,6 +299,8 @@ class DocumentManager:
             # Split each parsed page/section with the existing policy and carry scalar provenance.
             if disable_chunking:
                 pages = _coalesce_parser_sections(pages)
+            elif chunk_min_size:
+                pages = _coalesce_parser_sections(pages, min_text_length=chunk_min_size)
             chunked_pages: list[tuple[str, dict]] = []
             for page in pages:
                 content = page["text"]

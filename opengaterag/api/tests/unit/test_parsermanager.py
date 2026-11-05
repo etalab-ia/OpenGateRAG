@@ -1,6 +1,7 @@
 from importlib.metadata import version
 from io import BytesIO
 import socket
+from unittest.mock import patch
 import zipfile
 
 from docx import Document as DocxDocument
@@ -217,6 +218,28 @@ async def test_setext_marker_does_not_turn_a_multiline_paragraph_into_a_heading(
     parsed = await ParserManager().parse(make_upload(content.encode(), "notes.md", "text/markdown"))
 
     assert parsed == [{"text": content, "metadata": {}}]
+
+
+@pytest.mark.asyncio
+async def test_pdf_carries_active_heading_across_pages():
+    with pymupdf.open() as document:
+        for _ in range(3):
+            document.new_page()
+        content = document.tobytes()
+    parsed_pages = [
+        {"text": "# Shared heading\nfirst page body", "metadata": {"page": 1}},
+        {"text": "continuation body", "metadata": {"page": 2}},
+        {"text": "# New heading\nnew section body", "metadata": {"page": 3}},
+    ]
+
+    with patch("pymupdf4llm.to_markdown", return_value=parsed_pages):
+        parsed = await ParserManager().parse(make_upload(content, "continuation.pdf", "application/pdf"))
+
+    assert [(section["metadata"]["page"], section["metadata"]["heading"]) for section in parsed] == [
+        (1, "Shared heading"),
+        (2, "Shared heading"),
+        (3, "New heading"),
+    ]
 
 
 @pytest.mark.asyncio

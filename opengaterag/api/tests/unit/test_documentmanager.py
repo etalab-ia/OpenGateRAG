@@ -72,6 +72,7 @@ async def create_chunks_for_upload(
     filename: str = "test.pdf",
     content_type: str = "application/pdf",
     disable_chunking: bool = False,
+    chunk_min_size: int = 1,
 ) -> tuple[list[Chunk], MagicMock]:
     """Create chunks through DocumentManager and capture them before indexing."""
     mock_elasticsearch_vector_store = AsyncMock()
@@ -102,7 +103,7 @@ async def create_chunks_for_upload(
         metadata=metadata,
         chunk_size=100,
         chunk_overlap=10,
-        chunk_min_size=1,
+        chunk_min_size=chunk_min_size,
         name=None,
         disable_chunking=disable_chunking,
         separators=["\n\n", "\n", " "],
@@ -539,6 +540,26 @@ async def test_create_document_preserves_bounded_extended_provenance(mock_global
         assert len(chunk.metadata) == 14
         assert len(chunk.metadata["heading"]) == 255
     assert split.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_short_heading_sections_are_preserved_at_minimum_chunk_size(mock_global_tokenizer):
+    content = "# A\nshort body\n\n# B\nanother short body"
+    chunks, split = await create_chunks_for_upload(
+        parsed_content=[
+            {"text": "# A\nshort body", "metadata": {"heading": "A"}},
+            {"text": "# B\nanother short body", "metadata": {"heading": "B"}},
+        ],
+        metadata={"source": "report"},
+        split_results=[["combined short sections"]],
+        chunk_min_size=30,
+    )
+
+    assert len(chunks) == 1
+    assert chunks[0].content == "combined short sections"
+    assert chunks[0].metadata == {"source": "report"}
+    split.assert_called_once()
+    assert split.call_args.kwargs["content"] == content
 
 
 @pytest.mark.asyncio
