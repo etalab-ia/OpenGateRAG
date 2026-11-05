@@ -9,6 +9,8 @@
 
 OpenGateRAG ingests PDF, HTML, Markdown, TXT, DOCX, XLSX, PPTX, ODT, ODS, ODP, CSV and EPUB files. PDF and PPTX chunks retain 1-based source page or slide numbers in `metadata.page_number`; other formats leave it unset when no reliable physical pagination exists.
 
+When available, chunks also expose a scalar `metadata.heading` for their nearest source heading and the producing `metadata.parser_name` / `metadata.parser_version`. These four provenance keys are reserved and bounded to the existing scalar metadata contract, so no nested parser document is written to Elasticsearch. Existing documents remain readable without reindexing.
+
 DOCX, XLSX, PPTX, ODT, ODS, ODP, CSV and EPUB conversion runs locally through Docling without outbound resource fetching. ZIP-based documents are checked for malformed content, excessive member counts and decompressed-size limits before parsing. Existing LangChain chunking remains unchanged.
 
 ## Developer mode (local API)

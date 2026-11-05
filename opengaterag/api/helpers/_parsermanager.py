@@ -2,10 +2,13 @@ import asyncio
 import codecs
 from dataclasses import dataclass
 from enum import StrEnum
+from importlib.metadata import PackageNotFoundError, version
 from io import BytesIO
+import json
 import logging
 from pathlib import Path
 import posixpath
+import re
 from urllib.parse import unquote
 import zipfile
 
@@ -31,6 +34,7 @@ from docling.document_converter import (
     PowerpointFormatOption,
     WordFormatOption,
 )
+from docling_core.types.doc import DocItemLabel
 from fastapi import UploadFile
 from html_to_markdown import convert_to_markdown
 import pymupdf
@@ -39,6 +43,14 @@ import pymupdf4llm
 from opengaterag.api.utils.exceptions import UnsupportedFileTypeException
 
 logger = logging.getLogger(__name__)
+
+MARKDOWN_HEADING = re.compile(r"^ {0,3}(?P<marks>#{1,6})[ \t]+(?P<text>.*?)(?:[ \t]+#+)?[ \t]*$")
+MARKDOWN_SETEXT_HEADING = re.compile(r"^ {0,3}(?:=+|-+)[ \t]*$")
+MARKDOWN_FENCE = re.compile(r"^ {0,3}(?P<fence>`{3,}|~{3,})")
+
+
+def _normalize_metadata_text(value: str) -> str:
+    return " ".join(value.split())[:255]
 
 
 class FileType(StrEnum):
@@ -187,17 +199,30 @@ class ParserManager:
                     with pymupdf.open(stream=file_content, filetype="pdf") as doc:
                         if doc.page_count > self.max_pages:
                             raise ValueError("Document exceeds the page limit")
-                        content = await asyncio.to_thread(pymupdf4llm.to_markdown, doc, pages=pages, page_chunks=True)
+                        parsed_pages = await asyncio.to_thread(pymupdf4llm.to_markdown, doc, pages=pages, page_chunks=True)
+                parser_metadata = self._parser_provenance("pymupdf4llm")
+                content = [
+                    section
+                    for page in parsed_pages
+                    for section in self._markdown_sections(
+                        page["text"],
+                        {**parser_metadata, "page": page.get("metadata", {}).get("page")},
+                    )
+                ]
 
             case FileType.HTML:
                 file_content = await self._read_content(file=file)
-                content = convert_to_markdown(file_content).strip()
+                content = self._markdown_sections(
+                    convert_to_markdown(file_content).strip(),
+                    self._parser_provenance("html-to-markdown"),
+                )
 
             case FileType.MD:
-                content = (await self._read_content(file=file)).strip()
+                content = self._markdown_sections((await self._read_content(file=file)).strip())
 
             case FileType.TXT:
-                content = (await self._read_content(file=file)).strip()
+                text = (await self._read_content(file=file)).strip()
+                content = [{"text": text, "metadata": {}}] if text else []
 
             case _ if file_type in self.DOCLING_FORMATS:
                 async with self.conversion_semaphore:
@@ -209,7 +234,91 @@ class ParserManager:
 
         return self._check_output_limits(content)
 
-    def _parse_with_docling(self, content: bytes, filename: str, file_type: FileType) -> str | list[dict]:
+    @staticmethod
+    def _parser_provenance(parser_name: str, distribution_name: str | None = None) -> dict:
+        metadata = {"parser_name": parser_name}
+        try:
+            metadata["parser_version"] = version(distribution_name or parser_name)
+        except PackageNotFoundError:
+            pass
+        return metadata
+
+    @staticmethod
+    def _docling_headings(document, page_number: int | None = None) -> set[str]:
+        headings = set()
+        for item, _ in document.iterate_items():
+            if getattr(item, "label", None) not in {DocItemLabel.SECTION_HEADER, DocItemLabel.TITLE}:
+                continue
+            if page_number is not None and not any(prov.page_no == page_number for prov in getattr(item, "prov", [])):
+                continue
+            text = getattr(item, "text", None)
+            if isinstance(text, str) and (normalized := " ".join(text.split())):
+                headings.add(normalized)
+        return headings
+
+    @classmethod
+    def _markdown_sections(cls, text: str, metadata: dict | None = None, allowed_headings: set[str] | None = None) -> list[dict]:
+        """Split only at source headings; LangChain remains the chunker downstream."""
+        base_metadata = {key: value for key, value in (metadata or {}).items() if value is not None}
+        sections = []
+        current_lines = []
+        current_heading = None
+        fence_character = None
+        fence_length = 0
+
+        def flush_section() -> None:
+            section_text = "".join(current_lines).strip()
+            if not section_text:
+                return
+            section_metadata = dict(base_metadata)
+            if current_heading:
+                section_metadata["heading"] = _normalize_metadata_text(current_heading)
+            sections.append({"text": section_text, "metadata": section_metadata})
+
+        for line in text.splitlines(keepends=True):
+            fence_match = MARKDOWN_FENCE.match(line)
+            if fence_match:
+                marker = fence_match.group("fence")
+                remainder = line.strip()[len(marker) :]
+                if fence_character is None:
+                    fence_character = marker[0]
+                    fence_length = len(marker)
+                elif marker[0] == fence_character and len(marker) >= fence_length and not remainder:
+                    fence_character = None
+                current_lines.append(line)
+                continue
+
+            if fence_character is None and current_lines and MARKDOWN_SETEXT_HEADING.match(line.rstrip("\r\n")):
+                candidate_line = current_lines[-1]
+                candidate = candidate_line.strip()
+                heading = " ".join(candidate.split())
+                previous_lines = current_lines[:-1]
+                if (
+                    candidate
+                    and (not previous_lines or not previous_lines[-1].strip())
+                    and not MARKDOWN_HEADING.match(candidate_line.rstrip("\r\n"))
+                    and not re.match(r"^(?:[-+*>]|\d+[.)])\s", candidate)
+                    and (allowed_headings is None or heading in allowed_headings)
+                ):
+                    current_lines = previous_lines
+                    flush_section()
+                    current_lines = [candidate_line, line]
+                    current_heading = heading
+                    continue
+
+            heading_match = MARKDOWN_HEADING.match(line.rstrip("\r\n")) if fence_character is None else None
+            if heading_match:
+                heading = " ".join(heading_match.group("text").split())
+                if heading and (allowed_headings is None or heading in allowed_headings):
+                    flush_section()
+                    current_lines = []
+                    current_heading = heading
+            current_lines.append(line)
+
+        flush_section()
+        return sections
+
+    def _parse_with_docling(self, content: bytes, filename: str, file_type: FileType) -> list[dict]:
         if file_type in self.ARCHIVE_FILE_TYPES:
             self._check_archive_limits(content)
         if file_type == FileType.EPUB:
@@ -258,14 +367,24 @@ class ParserManager:
         if len(result.document.pages) > self.max_pages:
             raise ValueError("Document exceeds the page limit")
 
+        parser_metadata = self._parser_provenance("docling", "docling-slim")
         if file_type == FileType.PPTX:
             return [
-                {"text": text, "metadata": {"page": page_number}}
+                section
                 for page_number in sorted(result.document.pages)
                 if (text := result.document.export_to_markdown(page_no=page_number).strip())
+                for section in self._markdown_sections(
+                    text,
+                    {**parser_metadata, "page": page_number},
+                    self._docling_headings(result.document, page_number),
+                )
             ]
 
-        return result.document.export_to_markdown().strip()
+        return self._markdown_sections(
+            result.document.export_to_markdown().strip(),
+            parser_metadata,
+            self._docling_headings(result.document),
+        )
 
     @staticmethod
     def _validate_epub_content(content: bytes) -> None:
@@ -386,7 +505,7 @@ class ParserManager:
         if isinstance(content, str):
             output_bytes = len(content.encode("utf-8"))
         else:
-            output_bytes = sum(len(page["text"].encode("utf-8")) for page in content)
+            output_bytes = len(json.dumps(content, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
         if output_bytes > self.max_output_bytes:
             raise ValueError("Document exceeds the output-size limit")
         return content

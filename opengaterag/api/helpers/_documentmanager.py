@@ -41,6 +41,46 @@ from ._parserclient import DocumentParser
 
 logger = logging.getLogger(__name__)
 
+PARSER_PROVENANCE_KEYS = frozenset({"page_number", "heading", "parser_name", "parser_version"})
+
+
+def _parser_chunk_metadata(metadata: dict) -> dict:
+    """Whitelist scalar parser provenance before it reaches Elasticsearch or the API."""
+    provenance = {}
+    page_number = metadata.get("page")
+    if type(page_number) is int and page_number >= 1:
+        provenance["page_number"] = page_number
+    for parser_key, chunk_key in (("heading", "heading"), ("parser_name", "parser_name"), ("parser_version", "parser_version")):
+        value = metadata.get(parser_key)
+        if isinstance(value, str) and (normalized := " ".join(value.split())[:255]):
+            provenance[chunk_key] = normalized
+    return provenance
+
+
+def _coalesce_parser_sections(sections: list[dict]) -> list[dict]:
+    """Restore page/document chunks when chunking is disabled, even across heading sections."""
+    grouped_sections = []
+    grouped_headings = []
+    for section in sections:
+        metadata = section.get("metadata", {})
+        metadata = metadata if isinstance(metadata, dict) else {}
+        page_number = metadata.get("page")
+        if not grouped_sections or grouped_sections[-1][0] != page_number:
+            grouped_sections.append((page_number, {"text": [], "metadata": {key: value for key, value in metadata.items() if key != "heading"}}))
+            grouped_headings.append([])
+        grouped_sections[-1][1]["text"].append(section["text"])
+        heading = metadata.get("heading")
+        if isinstance(heading, str) and heading and heading not in grouped_headings[-1]:
+            grouped_headings[-1].append(heading)
+
+    coalesced = []
+    for (_, section), headings in zip(grouped_sections, grouped_headings, strict=True):
+        section["text"] = "\n\n".join(section["text"])
+        if len(headings) == 1:
+            section["metadata"]["heading"] = headings[0]
+        coalesced.append(section)
+    return coalesced
+
 
 class DocumentManager:
     BATCH_SIZE = 32
@@ -251,8 +291,10 @@ class DocumentManager:
                     detail=f"Upload size limit exceeded. Limit: {storage_limit} tokens. Current: {storage_consumption} tokens."
                 )
 
-            # split each page with the existing policy and carry its original 1-based page number
-            chunked_pages: list[tuple[str, int | None]] = []
+            # Split each parsed page/section with the existing policy and carry scalar provenance.
+            if disable_chunking:
+                pages = _coalesce_parser_sections(pages)
+            chunked_pages: list[tuple[str, dict]] = []
             for page in pages:
                 content = page["text"]
                 if not content.strip():
@@ -269,8 +311,9 @@ class DocumentManager:
                         chunk_min_size=chunk_min_size,
                         preset_separators=preset_separators,
                     )
-                page_number = page["metadata"].get("page")
-                chunked_pages.extend((chunk, page_number) for chunk in chunks)
+                page_metadata = page.get("metadata", {})
+                provenance = _parser_chunk_metadata(page_metadata if isinstance(page_metadata, dict) else {})
+                chunked_pages.extend((chunk, provenance) for chunk in chunks)
 
             if len(chunked_pages) == 0:
                 raise ChunkingFailedException(detail="No chunks were extracted from the document.")
@@ -294,13 +337,11 @@ class DocumentManager:
         await postgres_session.commit()
 
         if file:
-            # index the chunks into the vector store; page_number is reserved for parser-derived provenance
-            user_metadata = {key: value for key, value in (metadata or {}).items() if key != "page_number"}
+            # Parser-derived provenance is reserved and overrides user-supplied values.
+            user_metadata = {key: value for key, value in (metadata or {}).items() if key not in PARSER_PROVENANCE_KEYS}
             chunks: list[Chunk] = []
-            for i, (content, page_number) in enumerate(chunked_pages):
-                chunk_metadata = dict(user_metadata)
-                if page_number is not None:
-                    chunk_metadata["page_number"] = page_number
+            for i, (content, provenance) in enumerate(chunked_pages):
+                chunk_metadata = {**user_metadata, **provenance}
                 chunks.append(
                     Chunk(
                         id=i,

@@ -462,6 +462,8 @@ async def test_pdf_parser_page_selection_preserves_original_page_numbers():
     pages = await ParserManager().parse(file=file, pages=[1, 2])
 
     assert [page["metadata"]["page"] for page in pages] == [2, 3]
+    assert all(page["metadata"]["parser_name"] == "pymupdf4llm" for page in pages)
+    assert all(page["metadata"]["parser_version"] for page in pages)
     assert "Page 2 content" in pages[0]["text"]
     assert "Page 3 content" in pages[1]["text"]
 
@@ -504,6 +506,96 @@ async def test_create_pdf_document_page_number_takes_precedence_over_user_metada
 
 
 @pytest.mark.asyncio
+async def test_create_document_preserves_bounded_extended_provenance(mock_global_tokenizer):
+    user_metadata = {f"key{index}": f"value{index}" for index in range(10)}
+    long_heading = "Section\n" + "A" * 300
+    parsed_content = [
+        {
+            "text": "section text",
+            "metadata": {
+                "page": 2,
+                "heading": long_heading,
+                "parser_name": "docling",
+                "parser_version": "2.144.0",
+            },
+        }
+    ]
+
+    chunks, split = await create_chunks_for_upload(
+        parsed_content=parsed_content,
+        metadata=user_metadata,
+        split_results=[["first chunk", "second chunk"]],
+    )
+
+    expected_heading = " ".join(long_heading.split())[:255]
+    for chunk in chunks:
+        assert chunk.metadata == {
+            **user_metadata,
+            "page_number": 2,
+            "heading": expected_heading,
+            "parser_name": "docling",
+            "parser_version": "2.144.0",
+        }
+        assert len(chunk.metadata) == 14
+        assert len(chunk.metadata["heading"]) == 255
+    assert split.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_extended_provenance_overrides_reserved_user_metadata(mock_global_tokenizer):
+    chunks, _ = await create_chunks_for_upload(
+        parsed_content=[
+            {
+                "text": "section text",
+                "metadata": {"page": 3, "heading": "Real heading", "parser_name": "docling", "parser_version": "2.144.0"},
+            }
+        ],
+        metadata={"page_number": 999, "heading": "User heading", "parser_name": "user", "parser_version": "0"},
+        split_results=[["section chunk"]],
+    )
+
+    assert chunks[0].metadata == {
+        "page_number": 3,
+        "heading": "Real heading",
+        "parser_name": "docling",
+        "parser_version": "2.144.0",
+    }
+
+
+@pytest.mark.asyncio
+async def test_nested_and_invalid_parser_provenance_is_discarded(mock_global_tokenizer):
+    chunks, _ = await create_chunks_for_upload(
+        parsed_content=[
+            {
+                "text": "plain text",
+                "metadata": {
+                    "page": True,
+                    "heading": {"nested": "not scalar"},
+                    "parser_name": ["not", "scalar"],
+                    "parser_version": None,
+                    "format": "not whitelisted",
+                },
+            }
+        ],
+        metadata={"source": "report"},
+        split_results=[["plain text"]],
+    )
+
+    assert chunks[0].metadata == {"source": "report"}
+
+
+def test_chunk_metadata_rejects_more_than_ten_user_and_four_parser_keys():
+    with pytest.raises(ValueError, match="at most 14"):
+        Chunk(
+            id=1,
+            collection_id=123,
+            document_id=456,
+            content="too much metadata",
+            metadata={f"key{index}": "value" for index in range(15)},
+        )
+
+
+@pytest.mark.asyncio
 async def test_create_pdf_document_without_chunking_keeps_page_provenance(mock_global_tokenizer):
     chunks, split = await create_chunks_for_upload(
         parsed_content=[
@@ -520,6 +612,30 @@ async def test_create_pdf_document_without_chunking_keeps_page_provenance(mock_g
         {"source": "report", "page_number": 1},
         {"source": "report", "page_number": 2},
     ]
+    split.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_create_pdf_document_without_chunking_coalesces_heading_sections(mock_global_tokenizer):
+    chunks, split = await create_chunks_for_upload(
+        parsed_content=[
+            {"text": "page one preamble", "metadata": {"page": 1, "parser_name": "pymupdf4llm", "parser_version": "0.3.4"}},
+            {"text": "first heading\nfirst body", "metadata": {"page": 1, "heading": "First heading", "parser_name": "pymupdf4llm"}},
+            {"text": "second heading\nsecond body", "metadata": {"page": 1, "heading": "Second heading", "parser_name": "pymupdf4llm"}},
+            {"text": "page two", "metadata": {"page": 2, "parser_name": "pymupdf4llm", "parser_version": "0.3.4"}},
+        ],
+        metadata={"source": "report"},
+        split_results=[],
+        disable_chunking=True,
+    )
+
+    assert [chunk.content for chunk in chunks] == [
+        "page one preamble\n\nfirst heading\nfirst body\n\nsecond heading\nsecond body",
+        "page two",
+    ]
+    assert chunks[0].metadata == {"source": "report", "page_number": 1, "parser_name": "pymupdf4llm", "parser_version": "0.3.4"}
+    assert "heading" not in chunks[0].metadata
+    assert chunks[1].metadata["page_number"] == 2
     split.assert_not_called()
 
 
@@ -545,10 +661,10 @@ async def test_create_pdf_document_without_chunking_skips_blank_pages(mock_globa
     [("test.html", "text/html"), ("test.md", "text/markdown"), ("test.txt", "text/plain")],
 )
 @pytest.mark.asyncio
-async def test_non_pdf_documents_do_not_gain_page_number(mock_global_tokenizer, filename, content_type):
+async def test_non_pdf_documents_do_not_invent_parser_provenance(mock_global_tokenizer, filename, content_type):
     chunks, _ = await create_chunks_for_upload(
         parsed_content="plain text",
-        metadata={"source": "plain", "page_number": 999},
+        metadata={"source": "plain", "page_number": 999, "heading": "spoofed", "parser_name": "spoofed", "parser_version": "0"},
         split_results=[["plain text"]],
         filename=filename,
         content_type=content_type,

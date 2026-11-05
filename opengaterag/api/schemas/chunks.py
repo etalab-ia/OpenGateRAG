@@ -12,8 +12,8 @@ MetadataInt = Annotated[int, Field(ge=MIN_NUMBER, le=MAX_NUMBER)]
 MetadataFloat = Annotated[float, Field(ge=MIN_NUMBER, le=MAX_NUMBER)]
 Metadata = dict[MetadataStr, MetadataStr | MetadataInt | MetadataFloat | bool]
 InputChunkMetadata = Annotated[Metadata, Field(description="Extra metadata for the source", min_length=1, max_length=10)]  # fmt: off
-# A derived chunk can carry page_number in addition to the ten user-supplied keys.
-ChunkMetadata = Annotated[Metadata, Field(description="Extra metadata for the source", min_length=1, max_length=11)]  # fmt: off
+# Ten user keys plus four reserved parser-provenance keys: page_number, heading, parser_name and parser_version.
+ChunkMetadata = Annotated[Metadata, Field(description="Extra metadata for the source", min_length=1, max_length=14)]  # fmt: off
 
 
 class InputChunk(BaseModel):
