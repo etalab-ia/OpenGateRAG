@@ -7,12 +7,65 @@ services:
     env_file: .env
     environment:
       - "OPENGATELLM_URL=${OPENGATELLM_URL:-http://api:8000}"
+      - "PARSER_WORKER_URL=http://parser:8001"
+    depends_on:
+      parser:
+        condition: service_healthy
     ports:
       - "${RAG_PORT:-8000}:8000"
     volumes:
       - "${CONFIG_FILE:-./config.yml}:/config.yml:ro"
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1" ]
+    networks:
+      - default
+      - parser_internal
+
+  parser:
+    image: ghcr.io/etalab-ia/opengaterag:latest
+    restart: always
+    command:
+      - gunicorn
+      - opengaterag.api.parser_worker:app
+      - --worker-class
+      - uvicorn.workers.UvicornWorker
+      - --bind
+      - 0.0.0.0:8001
+      - --workers
+      - "${PARSER_WORKERS:-1}"
+      - --timeout
+      - "${PARSER_GUNICORN_TIMEOUT_SECONDS:-150}"
+      - --graceful-timeout
+      - "10"
+    environment:
+      - "PARSER_MAX_CONCURRENT=${PARSER_MAX_CONCURRENT:-2}"
+      - "PARSER_TIMEOUT_SECONDS=${PARSER_TIMEOUT_SECONDS:-120}"
+      - "PARSER_PROCESS_CPU_SECONDS=${PARSER_PROCESS_CPU_SECONDS:-120}"
+      - "PARSER_PROCESS_MEMORY_BYTES=${PARSER_PROCESS_MEMORY_BYTES:-1073741824}"
+      - "PARSER_MAX_INPUT_BYTES=${PARSER_MAX_INPUT_BYTES:-20000000}"
+      - "PARSER_MAX_OUTPUT_BYTES=${PARSER_MAX_OUTPUT_BYTES:-67108864}"
+      - "PARSER_MAX_PAGES=${PARSER_MAX_PAGES:-256}"
+      - "PARSER_ARCHIVE_MAX_FILE_BYTES=${PARSER_ARCHIVE_MAX_FILE_BYTES:-134217728}"
+      - "PARSER_ARCHIVE_MAX_TOTAL_BYTES=${PARSER_ARCHIVE_MAX_TOTAL_BYTES:-536870912}"
+      - "PARSER_ARCHIVE_MAX_MEMBER_COUNT=${PARSER_ARCHIVE_MAX_MEMBER_COUNT:-10000}"
+      - "PARSER_TEMPORARY_DIRECTORY=/tmp"
+    cpus: "${PARSER_CPU_LIMIT:-2}"
+    mem_limit: "${PARSER_MEMORY_LIMIT:-3g}"
+    pids_limit: "${PARSER_PID_LIMIT:-128}"
+    read_only: true
+    tmpfs:
+      - "/tmp:rw,noexec,nosuid,size=${PARSER_TEMPORARY_STORAGE_SIZE:-512m}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks:
+      - parser_internal
 
   postgres:
     image: postgres:16.5
@@ -52,6 +105,10 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+
+networks:
+  parser_internal:
+    internal: true
 
 volumes:
   postgres:

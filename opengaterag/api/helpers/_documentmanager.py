@@ -37,7 +37,7 @@ from opengaterag.api.utils.sql import Document as DocumentTable
 from opengaterag.api.utils.sql import User as UserTable
 
 from ._elasticsearchvectorstore import ElasticsearchVectorStore
-from ._parsermanager import ParserManager
+from ._parserclient import DocumentParser
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 class DocumentManager:
     BATCH_SIZE = 32
 
-    def __init__(self, model_name: str, model_api_url: str, parser_manager: ParserManager) -> None:
+    def __init__(self, model_name: str, model_api_url: str, parser_manager: DocumentParser) -> None:
         self.model_name = model_name
         self.model_api_url = model_api_url
         self.parser_manager = parser_manager
@@ -213,7 +213,7 @@ class DocumentManager:
         elasticsearch_vector_store: ElasticsearchVectorStore,
         elasticsearch_client: AsyncElasticsearch,
     ) -> int:
-        # check if collection exists and prepare document chunks in a single transaction
+        # check collection ownership before doing expensive work
         result = await postgres_session.execute(
             statement=select(CollectionTable)
             .where(CollectionTable.id == collection_id)
@@ -229,11 +229,14 @@ class DocumentManager:
         document_token_count = 0
 
         if file:
-            # parse the file, keeping PDF pages separate so their provenance survives chunking
+            # Do not hold a database transaction open while the isolated parser runs.
+            await postgres_session.rollback()
             try:
                 parsed_content = await self.parser_manager.parse(file=file)
                 pages = [{"text": parsed_content, "metadata": {}}] if isinstance(parsed_content, str) else parsed_content
                 document_token_count = sum(len(global_context.tokenizer.encode(page["text"])) for page in pages)
+            except FileSizeLimitExceededException:
+                raise
             except Exception as e:
                 logger.exception(f"failed to parse {document_name} ({e}).")
                 raise ParsingDocumentFailedException()

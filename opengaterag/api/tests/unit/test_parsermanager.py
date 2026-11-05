@@ -3,6 +3,7 @@ import socket
 import zipfile
 
 from fastapi import UploadFile
+import pymupdf
 import pytest
 from starlette.datastructures import Headers
 
@@ -133,3 +134,34 @@ async def test_epub_requires_every_spine_document_to_be_readable(tmp_path):
     for filename, options in (("invalid.epub", {"invalid_chapter": True}), ("missing.epub", {"missing_chapter": True})):
         with pytest.raises(ValueError, match="Invalid EPUB content document"):
             await ParserManager().parse(make_upload(build_epub(tmp_path / filename, **options), filename, EPUB_MIME))
+
+
+@pytest.mark.asyncio
+async def test_input_size_limit_is_enforced_before_parsing():
+    with pytest.raises(ValueError, match="input-size limit"):
+        await ParserManager(max_input_bytes=4).parse(make_upload(b"12345", "notes.txt", "text/plain"))
+
+
+@pytest.mark.asyncio
+async def test_output_size_limit_is_enforced():
+    with pytest.raises(ValueError, match="output-size limit"):
+        await ParserManager(max_output_bytes=4).parse(make_upload(b"12345", "notes.txt", "text/plain"))
+
+
+@pytest.mark.asyncio
+async def test_pdf_page_limit_is_enforced_before_conversion():
+    with pymupdf.open() as document:
+        document.new_page()
+        document.new_page()
+        content = document.tobytes()
+
+    with pytest.raises(ValueError, match="page limit"):
+        await ParserManager(max_pages=1).parse(make_upload(content, "pages.pdf", "application/pdf"))
+
+
+@pytest.mark.asyncio
+async def test_docling_page_limit_is_enforced(tmp_path):
+    content = build_pptx(tmp_path / "slides.pptx")
+
+    with pytest.raises(ValueError, match="page limit"):
+        await ParserManager(max_pages=1).parse(make_upload(content, "slides.pptx", PPTX_MIME))

@@ -43,11 +43,19 @@ DOCX, XLSX, PPTX, ODT, ODS, ODP, CSV and EPUB conversion runs locally through Do
     alembic -c opengaterag/api/alembic.ini upgrade head
     ```
 
-* Run API locally
+* Start the isolated parser worker
+
+    ```bash
+    uvicorn opengaterag.api.parser_worker:app --host 127.0.0.1 --port 8001
+    ```
+
+* Run API locally in another terminal
 
     ```bash
     uvicorn opengaterag.api.app:app --reload
     ```
+
+The example Docker Compose deployment starts this worker automatically. The worker has no API or database credentials, uses an internal-only network, runs without root privileges, and enforces input, output, page, archive, CPU, memory and timeout limits. Its temporary files live on a bounded in-memory filesystem and are removed after each conversion.
 
 ### Run tests
 
