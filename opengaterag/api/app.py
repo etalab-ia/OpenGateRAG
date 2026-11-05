@@ -12,6 +12,7 @@ from starlette.responses import Response
 
 from opengaterag.api.utils.configuration import Configuration, get_configuration
 from opengaterag.api.utils.lifespan import lifespan
+from opengaterag.api.utils.requestlimits import RequestBodyLimitMiddleware
 from opengaterag.api.utils.variables import RouterName
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ def create_app(
         openapi_url=None,
         lifespan=None if skip_lifespan else lifespan,
     )
+    app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=configuration.settings.document_upload_max_body_bytes)
     _register_routers(app, configuration)
     _setup_monitoring(app, configuration)
     _setup_unified_docs(app, configuration)

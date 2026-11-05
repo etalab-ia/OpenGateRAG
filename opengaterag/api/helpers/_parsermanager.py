@@ -162,9 +162,19 @@ class ParserManager:
         FileType.EPUB,
     }
 
-    def __init__(self, max_concurrent: int = 10, archive_limits: ParserArchiveLimits | None = None):
+    def __init__(
+        self,
+        max_concurrent: int = 10,
+        archive_limits: ParserArchiveLimits | None = None,
+        max_input_bytes: int = 20_000_000,
+        max_output_bytes: int = 64 * 1024 * 1024,
+        max_pages: int = 256,
+    ):
         self.conversion_semaphore = asyncio.Semaphore(value=max_concurrent)
         self.archive_limits = archive_limits or ParserArchiveLimits()
+        self.max_input_bytes = max_input_bytes
+        self.max_output_bytes = max_output_bytes
+        self.max_pages = max_pages
 
     async def parse(self, file: UploadFile, pages: list[int] | None = None) -> str | list[dict]:
         file_type = self.check_file_type(file=file)
@@ -173,8 +183,10 @@ class ParserManager:
         match file_type:
             case FileType.PDF:
                 async with self.conversion_semaphore:
-                    file_content = await file.read()
+                    file_content = await self._read_bytes(file=file)
                     with pymupdf.open(stream=file_content, filetype="pdf") as doc:
+                        if doc.page_count > self.max_pages:
+                            raise ValueError("Document exceeds the page limit")
                         content = await asyncio.to_thread(pymupdf4llm.to_markdown, doc, pages=pages, page_chunks=True)
 
             case FileType.HTML:
@@ -182,22 +194,20 @@ class ParserManager:
                 content = convert_to_markdown(file_content).strip()
 
             case FileType.MD:
-                file_content = await self._read_content(file=file)
-                content = file_content.strip()
+                content = (await self._read_content(file=file)).strip()
 
             case FileType.TXT:
-                file_content = await self._read_content(file=file)
-                content = file_content.strip()
+                content = (await self._read_content(file=file)).strip()
 
             case _ if file_type in self.DOCLING_FORMATS:
                 async with self.conversion_semaphore:
-                    file_content = await file.read()
+                    file_content = await self._read_bytes(file=file)
                     filename = Path(file.filename or f"document.{file_type.value}").name
                     if Path(filename).suffix.lower() not in self.EXTENSION_MAP:
                         filename = f"{filename}.{file_type.value}"
                     content = await asyncio.to_thread(self._parse_with_docling, file_content, filename, file_type)
 
-        return content
+        return self._check_output_limits(content)
 
     def _parse_with_docling(self, content: bytes, filename: str, file_type: FileType) -> str | list[dict]:
         if file_type in self.ARCHIVE_FILE_TYPES:
@@ -245,6 +255,8 @@ class ParserManager:
         if result.status != ConversionStatus.SUCCESS or result.document is None:
             logger.debug("Docling rejected %s: %s", filename, result.errors)
             raise ValueError("Document conversion failed or produced partial output")
+        if len(result.document.pages) > self.max_pages:
+            raise ValueError("Document exceeds the page limit")
 
         if file_type == FileType.PPTX:
             return [
@@ -361,9 +373,26 @@ class ParserManager:
 
         return detected_type
 
-    @staticmethod
-    async def _read_content(file: UploadFile) -> str:
-        content_bytes = await file.read()
+    async def _read_bytes(self, file: UploadFile) -> bytes:
+        content = await file.read(self.max_input_bytes + 1)
+        if len(content) > self.max_input_bytes:
+            raise ValueError("Document exceeds the input-size limit")
+        await file.seek(0)
+        return content
+
+    def _check_output_limits(self, content: str | list[dict] | None) -> str | list[dict]:
+        if content is None:
+            raise ValueError("Document conversion produced no output")
+        if isinstance(content, str):
+            output_bytes = len(content.encode("utf-8"))
+        else:
+            output_bytes = sum(len(page["text"].encode("utf-8")) for page in content)
+        if output_bytes > self.max_output_bytes:
+            raise ValueError("Document exceeds the output-size limit")
+        return content
+
+    async def _read_content(self, file: UploadFile) -> str:
+        content_bytes = await self._read_bytes(file=file)
         try:
             content = content_bytes.decode("utf-8")
         except UnicodeDecodeError:
@@ -372,7 +401,5 @@ class ParserManager:
             except UnicodeDecodeError as e:
                 logger.debug(msg=f"Encoding problem detected for {file.filename}: {e}")
                 content = content_bytes.decode("utf-8", errors="replace")
-
-        await file.seek(0)
 
         return content

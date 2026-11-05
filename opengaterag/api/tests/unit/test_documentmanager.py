@@ -968,13 +968,20 @@ async def test_search_chunks_collection_not_found():
 
 @pytest.mark.asyncio
 async def test_create_document_parsing_fails():
-    """Test ParsingDocumentFailedException when parser fails."""
+    """A parser timeout closes the transaction and never creates an indexed document."""
+    events = []
     mock_elasticsearch_vector_store = AsyncMock()
     mock_elasticsearch_client = AsyncMock()
     mock_parser = AsyncMock()
-    mock_parser.parse = AsyncMock(side_effect=Exception("Parse error"))
+
+    async def fail_parse(**kwargs):
+        events.append("parse")
+        raise TimeoutError("Parser timed out")
+
+    mock_parser.parse = AsyncMock(side_effect=fail_parse)
     mock_session = AsyncMock(spec=AsyncSession)
     mock_session.execute = AsyncMock()
+    mock_session.rollback = AsyncMock(side_effect=lambda: events.append("rollback"))
 
     collection_result = MagicMock()
     collection_result.scalar_one.return_value = MagicMock()
@@ -1004,6 +1011,11 @@ async def test_create_document_parsing_fails():
             preset_separators="markdown",
             is_separator_regex=False,
         )
+
+    assert events == ["rollback", "parse"]
+    assert mock_session.execute.await_count == 1
+    mock_session.commit.assert_not_called()
+    mock_elasticsearch_vector_store.delete_document.assert_not_called()
 
 
 @pytest.mark.asyncio

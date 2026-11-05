@@ -9,7 +9,7 @@ from tiktoken.core import Encoding
 
 from opengaterag.api.helpers._documentmanager import DocumentManager
 from opengaterag.api.helpers._elasticsearchvectorstore import ElasticsearchVectorStore
-from opengaterag.api.helpers._parsermanager import ParserManager
+from opengaterag.api.helpers._parserclient import ParserClient
 from opengaterag.api.utils.configuration import Configuration, Tokenizer, get_configuration
 from opengaterag.api.utils.context import global_context
 from opengaterag.api.utils.logging import init_logger
@@ -96,7 +96,13 @@ async def create_elasticsearch_vector_store(configuration: Configuration, elasti
 
 
 def create_document_manager(configuration: Configuration) -> DocumentManager:
-    parser_manager = ParserManager(max_concurrent=configuration.settings.document_parsing_max_concurrent)
+    parser_manager = ParserClient(
+        worker_url=configuration.settings.document_parser_url,
+        timeout_seconds=configuration.settings.document_parser_timeout_seconds,
+        max_input_bytes=configuration.settings.document_parser_max_input_bytes,
+        max_response_bytes=configuration.settings.document_parser_max_response_bytes,
+        max_concurrent=configuration.settings.document_parsing_max_concurrent,
+    )
     return DocumentManager(
         model_api_url=configuration.dependencies.opengatellm.url,
         model_name=configuration.dependencies.opengatellm.model_name,

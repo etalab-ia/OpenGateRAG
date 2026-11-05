@@ -1,6 +1,9 @@
 import asyncio
 from collections.abc import Generator, Mapping
 import os
+import subprocess
+import sys
+import time
 from typing import Any
 
 from elasticsearch import AsyncElasticsearch
@@ -129,7 +132,50 @@ def setup_elasticsearch_index() -> None:
 
 
 @pytest.fixture(scope="session")
-def test_client(setup_elasticsearch_index) -> Generator[TestClient, None, None]:
+def parser_worker() -> Generator[subprocess.Popen, None, None]:
+    environment = {
+        "HOME": os.environ.get("HOME", "/tmp"),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "PATH": os.environ.get("PATH", os.defpath),
+        "PYTHONPATH": os.getcwd(),
+        "TMPDIR": os.environ.get("TMPDIR", "/tmp"),
+    }
+    process = subprocess.Popen(
+        [sys.executable, "-m", "opengaterag.api.parser_worker"],
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 60
+        with httpx.Client() as client:
+            while True:
+                if process.poll() is not None:
+                    output = process.stdout.read() if process.stdout else ""
+                    raise RuntimeError(f"Parser worker exited during startup: {output}")
+                try:
+                    response = client.get("http://127.0.0.1:8001/health", timeout=1)
+                    if response.status_code == 200:
+                        break
+                except httpx.HTTPError:
+                    pass
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("Parser worker did not become healthy within 60 seconds")
+                time.sleep(0.1)
+        yield process
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=10)
+
+
+@pytest.fixture(scope="session")
+def test_client(setup_elasticsearch_index, parser_worker) -> Generator[TestClient, None, None]:
     """Single TestClient for the session to keep one event loop and one app lifespan."""
     with TestClient(app=app) as client:
         yield client

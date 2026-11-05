@@ -176,7 +176,12 @@ class Settings(ConfigBaseModel):
     """
 
     # document_parsing
-    document_parsing_max_concurrent: int = Field(default=10, ge=1, description="Maximum number of concurrent document parsing tasks per worker.")  # fmt: off
+    document_parsing_max_concurrent: int = Field(default=2, ge=1, description="Maximum number of concurrent parser requests per API worker.")  # fmt: off
+    document_parser_url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(default="http://localhost:8001", description="Internal URL of the isolated document parser worker.")  # fmt: off
+    document_parser_timeout_seconds: int = Field(default=120, ge=1, description="Total timeout for one isolated document parsing request.")  # fmt: off
+    document_parser_max_response_bytes: int = Field(default=64 * 1024 * 1024, ge=1, description="Maximum parser response size accepted by the API.")  # fmt: off
+    document_parser_max_input_bytes: int = Field(default=20_000_000, ge=1, description="Maximum uploaded document size accepted by the parser client.")  # fmt: off
+    document_upload_max_body_bytes: int = Field(default=21_000_000, ge=1, description="Maximum multipart request body size for document uploads, including form metadata.")  # fmt: off
 
     # storage
     storage_default_limit: int | None = Field(default=10_000_000, ge=0, description="Default storage limit in tokens assigned to newly created users. If null, new users have no storage limit.")  # fmt: off

@@ -28,6 +28,13 @@ dependencies:
 
 # ---------------------------------- settings -----------------------------------
 settings:
+  document_parser_url: ${PARSER_WORKER_URL:-http://localhost:8001}
+  document_parser_timeout_seconds: 120
+  document_parser_max_response_bytes: 67108864
+  document_parser_max_input_bytes: 20000000
+  document_upload_max_body_bytes: 21000000
+  document_parsing_max_concurrent: 2
+
   # storage_default_limit: 10000000  # 10M tokens by default, set to null for unlimited
   # storage_compute_tokenizer: tiktoken_gpt2  # default tokenizer
   # disabled_routers: ["collections"]
