@@ -1,3 +1,4 @@
+from fastapi import FastAPI, File, UploadFile
 import pytest
 from starlette.responses import JSONResponse
 
@@ -74,3 +75,50 @@ async def test_body_within_limit_reaches_downstream():
 
     assert messages[0]["status"] == 200
     assert downstream_called is True
+
+
+@pytest.mark.asyncio
+async def test_chunked_multipart_over_limit_returns_413_from_fastapi():
+    app = FastAPI()
+
+    @app.post("/v1/documents")
+    async def upload(file: UploadFile = File(...)):
+        return JSONResponse({"filename": file.filename})
+
+    app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=64)
+    boundary = "parser-boundary"
+    body = (
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="file"; filename="notes.txt"\r\n'
+        "Content-Type: text/plain\r\n\r\n"
+        "this multipart document exceeds the request body limit\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+    messages = [
+        {"type": "http.request", "body": body[:40], "more_body": True},
+        {"type": "http.request", "body": body[40:], "more_body": False},
+    ]
+    sent_messages = []
+
+    async def receive():
+        if messages:
+            return messages.pop(0)
+        return {"type": "http.disconnect"}
+
+    async def send(message):
+        sent_messages.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/v1/documents",
+        "root_path": "",
+        "query_string": b"",
+        "headers": [(b"content-type", f"multipart/form-data; boundary={boundary}".encode())],
+    }
+    await app(scope, receive, send)
+
+    assert sent_messages[0]["status"] == 413

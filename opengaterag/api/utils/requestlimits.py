@@ -1,10 +1,12 @@
 from starlette.datastructures import Headers
+from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 
-class RequestBodyLimitExceededError(Exception):
-    pass
+class RequestBodyLimitExceededError(HTTPException):
+    def __init__(self) -> None:
+        super().__init__(status_code=413, detail="Document upload request exceeds the size limit")
 
 
 class RequestBodyLimitMiddleware:
