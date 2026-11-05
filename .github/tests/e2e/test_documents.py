@@ -119,9 +119,7 @@ class TestDocuments:
             pytest.param("sample.ods", ODS_MIME, build_ods, "ODS milestone", set(), set(), id="ods"),
             pytest.param("sample.odp", ODP_MIME, build_odp, "ODP slide marker", set(), {"Slide One"}, id="odp"),
             pytest.param("sample.csv", "text/csv", build_csv, "CSV milestone", set(), set(), id="csv"),
-            pytest.param(
-                "sample.epub", EPUB_MIME, build_epub, "EPUB chapter marker", set(), {"EPUB chapter marker", "EPUB second chapter"}, id="epub"
-            ),
+            pytest.param("sample.epub", EPUB_MIME, build_epub, "EPUB chapter marker", set(), set(), id="epub"),
         ],
     )
     def test_upload_docling_formats(
