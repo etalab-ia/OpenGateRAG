@@ -21,15 +21,40 @@ async def test_parse_streams_upload_and_restores_file_position():
         assert request.url.path == "/v1/parse"
         assert b'filename="notes.txt"' in body
         assert b"plain text" in body
-        return httpx.Response(200, json={"content": [{"text": "page text", "metadata": {"page": 1}}]})
+        return httpx.Response(
+            200,
+            json={
+                "content": [
+                    {
+                        "text": "page text",
+                        "metadata": {"page": 1, "heading": "Source heading", "parser_name": "docling", "parser_version": "2.144.0"},
+                    }
+                ]
+            },
+        )
 
     upload = make_upload()
     parser = ParserClient("http://parser:8001", transport=httpx.MockTransport(handler))
 
     parsed = await parser.parse(upload, pages=[0])
 
-    assert parsed == [{"text": "page text", "metadata": {"page": 1}}]
+    assert parsed == [
+        {
+            "text": "page text",
+            "metadata": {"page": 1, "heading": "Source heading", "parser_name": "docling", "parser_version": "2.144.0"},
+        }
+    ]
     assert await upload.read() == b"plain text"
+
+
+@pytest.mark.asyncio
+async def test_parse_accepts_legacy_string_response():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"content": "legacy text"})
+
+    parser = ParserClient("http://parser:8001", transport=httpx.MockTransport(handler))
+
+    assert await parser.parse(make_upload()) == "legacy text"
 
 
 @pytest.mark.asyncio

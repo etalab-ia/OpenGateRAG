@@ -1,3 +1,4 @@
+from importlib.metadata import version
 import json
 from pathlib import Path
 from time import sleep
@@ -95,26 +96,45 @@ class TestDocuments:
         assert chunks.data[0].collection_id == collection
         assert chunks.data[0].document_id == document_id
         assert chunks.data[0].content != ""
-        assert chunks.data[0].metadata == {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 1}
+        assert chunks.data[0].metadata == {
+            "source_title": "test",
+            "source_tags": "tag-1,tag-2",
+            "page_number": 1,
+            "parser_name": "pymupdf4llm",
+            "parser_version": version("pymupdf4llm"),
+        }
         assert chunks.data[-1].metadata["page_number"] == 2
+        assert chunks.data[-1].metadata["heading"] == "TEXTES GÉNÉRAUX"
         assert all(chunk.metadata["source_title"] == "test" for chunk in chunks.data)
         assert all(chunk.metadata["source_tags"] == "tag-1,tag-2" for chunk in chunks.data)
 
     @pytest.mark.parametrize(
-        ("filename", "content_type", "builder", "expected", "expected_pages"),
+        ("filename", "content_type", "builder", "expected", "expected_pages", "expected_headings"),
         [
-            pytest.param("sample.docx", DOCX_MIME, build_docx, "DOCX milestone", set(), id="docx"),
-            pytest.param("sample.xlsx", XLSX_MIME, build_xlsx, "XLSX milestone", set(), id="xlsx"),
-            pytest.param("sample.pptx", PPTX_MIME, build_pptx, "First slide marker", {1, 2}, id="pptx"),
-            pytest.param("sample.odt", ODT_MIME, build_odt, "ODT milestone", set(), id="odt"),
-            pytest.param("sample.ods", ODS_MIME, build_ods, "ODS milestone", set(), id="ods"),
-            pytest.param("sample.odp", ODP_MIME, build_odp, "ODP slide marker", set(), id="odp"),
-            pytest.param("sample.csv", "text/csv", build_csv, "CSV milestone", set(), id="csv"),
-            pytest.param("sample.epub", EPUB_MIME, build_epub, "EPUB chapter marker", set(), id="epub"),
+            pytest.param("sample.docx", DOCX_MIME, build_docx, "DOCX milestone", set(), {"DOCX milestone"}, id="docx"),
+            pytest.param("sample.xlsx", XLSX_MIME, build_xlsx, "XLSX milestone", set(), set(), id="xlsx"),
+            pytest.param(
+                "sample.pptx", PPTX_MIME, build_pptx, "First slide marker", {1, 2}, {"First slide marker", "Second slide marker"}, id="pptx"
+            ),
+            pytest.param("sample.odt", ODT_MIME, build_odt, "ODT milestone", set(), {"ODT milestone"}, id="odt"),
+            pytest.param("sample.ods", ODS_MIME, build_ods, "ODS milestone", set(), set(), id="ods"),
+            pytest.param("sample.odp", ODP_MIME, build_odp, "ODP slide marker", set(), {"Slide One"}, id="odp"),
+            pytest.param("sample.csv", "text/csv", build_csv, "CSV milestone", set(), set(), id="csv"),
+            pytest.param("sample.epub", EPUB_MIME, build_epub, "EPUB chapter marker", set(), set(), id="epub"),
         ],
     )
     def test_upload_docling_formats(
-        self, user_client: TestClient, collection: int, es_refresh, tmp_path: Path, filename, content_type, builder, expected, expected_pages
+        self,
+        user_client: TestClient,
+        collection: int,
+        es_refresh,
+        tmp_path: Path,
+        filename,
+        content_type,
+        builder,
+        expected,
+        expected_pages,
+        expected_headings,
     ):
         content = builder(tmp_path / filename)
         data = {
@@ -139,6 +159,9 @@ class TestDocuments:
 
             assert expected in "\n".join(chunk.content for chunk in chunks.data)
             assert all(chunk.metadata["source_title"] == "docling-fixture" for chunk in chunks.data)
+            assert all(chunk.metadata["parser_name"] == "docling" for chunk in chunks.data)
+            assert all(chunk.metadata["parser_version"] == version("docling-slim") for chunk in chunks.data)
+            assert {chunk.metadata["heading"] for chunk in chunks.data if "heading" in chunk.metadata} == expected_headings
             if expected_pages:
                 assert {chunk.metadata["page_number"] for chunk in chunks.data} == expected_pages
                 assert len(chunks.data) == len(expected_pages)
@@ -175,6 +198,11 @@ class TestDocuments:
             assert set(page_numbers) == {1, 2}
             assert any(page_numbers.count(page_number) > 1 for page_number in (1, 2))
             assert all(chunk.metadata["source_title"] == "docling-chunking-fixture" for chunk in chunks.data)
+            for chunk in chunks.data:
+                expected_heading = "First slide marker" if chunk.metadata["page_number"] == 1 else "Second slide marker"
+                assert chunk.metadata["heading"] == expected_heading
+                assert chunk.metadata["parser_name"] == "docling"
+                assert chunk.metadata["parser_version"] == version("docling-slim")
             combined_text = "\n".join(chunk.content for chunk in chunks.data)
             normalized_text = " ".join(combined_text.split())
             assert "First slide marker" in normalized_text
@@ -239,9 +267,10 @@ class TestDocuments:
         chunks = Chunks(**chunks)  # test output format
         assert len(chunks.data) == 2
         assert all(chunk.content != "" for chunk in chunks.data)
+        pdf_provenance = {"parser_name": "pymupdf4llm", "parser_version": version("pymupdf4llm")}
         assert [chunk.metadata for chunk in chunks.data] == [
-            {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 1},
-            {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 2},
+            {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 1, **pdf_provenance},
+            {"source_title": "test", "source_tags": "tag-1,tag-2", "page_number": 2, "heading": "TEXTES GÉNÉRAUX", **pdf_provenance},
         ]
 
     def test_create_document_without_file(self, user_client: TestClient, admin_client: TestClient, collection):

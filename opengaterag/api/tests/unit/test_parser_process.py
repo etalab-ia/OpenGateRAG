@@ -56,7 +56,7 @@ def test_real_parser_runs_in_a_subprocess(tmp_path):
 
     parsed = run_isolated(make_request(source), timeout_seconds=30, cpu_seconds=30, memory_bytes=1024 * 1024 * 1024)
 
-    assert parsed == "hello isolated parser"
+    assert parsed == [{"text": "hello isolated parser", "metadata": {}}]
 
 
 def test_docling_runs_under_process_resource_limits(tmp_path):
@@ -65,7 +65,9 @@ def test_docling_runs_under_process_resource_limits(tmp_path):
 
     parsed = run_isolated(make_request(source, DOCX_MIME), timeout_seconds=30, cpu_seconds=30, memory_bytes=1024 * 1024 * 1024)
 
-    assert "DOCX milestone" in parsed
+    assert "DOCX milestone" in parsed[0]["text"]
+    assert parsed[0]["metadata"]["heading"] == "DOCX milestone"
+    assert parsed[0]["metadata"]["parser_name"] == "docling"
 
 
 def test_pdf_runs_under_process_resource_limits(tmp_path):
