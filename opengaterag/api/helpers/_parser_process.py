@@ -39,7 +39,8 @@ def _parse_document(connection: Any, request: ParserProcessRequest) -> None:
             max_member_count=request.archive_max_member_count,
         ),
     )
-    with open(request.input_path, "rb") as source:
+    input_path = os.path.realpath(request.input_path, strict=True)
+    with open(input_path, "rb") as source:
         upload = UploadFile(filename=request.filename, file=source, headers=Headers({"content-type": request.content_type}))
         content = asyncio.run(parser.parse(file=upload, pages=request.pages))
     connection.send({"ok": True, "content": content})
