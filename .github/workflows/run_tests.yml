@@ -20,7 +20,7 @@ jobs:
         with:
           ref: ${{ github.head_ref || github.ref_name }}
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
       - name: Set up Docker Compose
         run: |
@@ -45,7 +45,7 @@ jobs:
 
       - name: Commit unit coverage badge
         if: github.event.pull_request.base.ref == 'main'
-        uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7.2.0
+        uses: stefanzweifel/git-auto-commit-action@d0b01107b5db882071f96de5dd4b54961ea93f4c # v7.2.1
         with:
           commit_message: Update unit coverage badge
           file_pattern: .github/badges/coverage.json
@@ -58,7 +58,7 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+    - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
     - name: Resolve latest OpenGateLLM (pre)release
       run: echo "OPENGATELLM_VERSION=$(gh api 'repos/etalab-ia/opengatellm/releases?per_page=1' --jq '.[0].tag_name')" | tee -a "${GITHUB_ENV}"
