@@ -343,17 +343,18 @@ class ElasticsearchVectorStore:
         search_map = {}
         for searches in [lexical_searches, semantic_searches]:
             for rank, search in enumerate(searches):
-                chunk_id = search.chunk.document_id + search.chunk.id
-                if chunk_id not in combined_scores:
-                    combined_scores[chunk_id] = 0
-                    search_map[chunk_id] = search
-                    search_map[chunk_id].method = SearchMethod.HYBRID
-                combined_scores[chunk_id] += 1 / (rff_k + rank + 1)
+                # A chunk is identified by the (document_id, chunk id) pair: chunk ids are only unique within a document
+                chunk_key = (search.chunk.document_id, search.chunk.id)
+                if chunk_key not in combined_scores:
+                    combined_scores[chunk_key] = 0
+                    search_map[chunk_key] = search
+                    search_map[chunk_key].method = SearchMethod.HYBRID
+                combined_scores[chunk_key] += 1 / (rff_k + rank + 1)
 
         ranked_scores = sorted(combined_scores.items(), key=lambda item: item[1], reverse=True)
         reranked_searches = []
-        for chunk_id, rrf_score in ranked_scores:
-            search = search_map[chunk_id]
+        for chunk_key, rrf_score in ranked_scores:
+            search = search_map[chunk_key]
             search.score = rrf_score
             reranked_searches.append(search)
 
