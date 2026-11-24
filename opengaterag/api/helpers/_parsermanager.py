@@ -92,7 +92,8 @@ class ParserManager:
         try:
             filename = file.filename or ""
             extension = Path(filename).suffix.lower()
-            content_type = file.content_type or ""
+            # ignore parameters such as charset (e.g. "text/plain; charset=utf-8"), media types are case-insensitive
+            content_type = (file.content_type or "").split(";")[0].strip().lower()
         except Exception:
             raise UnsupportedFileTypeException()
 
